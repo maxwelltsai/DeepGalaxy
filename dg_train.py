@@ -9,15 +9,15 @@ Maxwell Cai (SURF), October - November 2019.
 
 
 
-import keras as K
+# import keras as K
 import tensorflow as tf
 # import efficientnet.keras_custom as efn
-import efficientnet.keras as efn
+import efficientnet.tfkeras as efn
 from skimage.io import imread
-from efficientnet.keras import center_crop_and_resize, preprocess_input
+from efficientnet.tfkeras import center_crop_and_resize, preprocess_input
 # from efficientnet.keras_custom import center_crop_and_resize, preprocess_input
-from keras.applications.imagenet_utils import decode_predictions
-from keras.preprocessing.image import ImageDataGenerator
+# from keras.applications.imagenet_utils import decode_predictions
+# from keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 import pandas as pd
 from data_io import DataIO
@@ -28,6 +28,7 @@ import psutil
 import socket
 from keras.callbacks import Callback
 import time
+import argparse 
 
 try:
     import horovod.keras as hvd
@@ -48,20 +49,22 @@ class DeepGalaxyTraining(object):
         self.num_classes = 0
         self.epochs = 12
         self.batch_size = 4
-        self.use_noise = True
-        self.distributed_training = True
+        self.use_noise = False 
+        self.distributed_training = False 
         self.multi_gpu_training = False
         self._multi_gpu_model = None
         self.callbacks = []
         self.f_usage = None
         self.input_shape = (512, 512, 3)  # (256, 256, 3)
+        self._t_start = 0
+        self._t_end = 0
 
     def get_flops(self, model):
         run_meta = tf.RunMetadata()
         opts = tf.profiler.ProfileOptionBuilder.float_operation()
 
         # We use the Keras session graph in the call to the profiler.
-        flops = tf.profiler.profile(graph=K.backend.get_session().graph,
+        flops = tf.profiler.profile(graph=tf.keras.backend.get_session().graph,
                                     run_meta=run_meta, cmd='op', options=opts)
 
         return flops.total_float_ops  # Prints the "flops" of the model.
@@ -77,7 +80,7 @@ class DeepGalaxyTraining(object):
                 import horovod.keras as hvd
                 # initialize horovod
                 hvd.init()
-                self.callbacks = [hvd.callbacks.BroadcastGlobalVariablesCallback(0)]
+                self.callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
                 # self.callbacks = [hvd.BroadcastGlobalVariablesHook(0)]
                 if hvd.rank() == 0:
                     self.f_usage = open('usage_%d_2048.txt' % hvd.size(), 'w')
@@ -88,7 +91,7 @@ class DeepGalaxyTraining(object):
                 self.distributed_training = False
         else:
             self.f_usage = open('usage_2048.txt', 'w')
-            self.f_usage.write('batch_size: %d, N_train_batches: %d, N_test_batches: %d\n' % (batch_size, train_batches, 0))
+            # self.f_usage.write('batch_size: %d, N_train_batches: %d, N_test_batches: %d\n' % (self.batch_size, train_batches, 0))
             self.f_usage.flush()
 
 
@@ -118,43 +121,43 @@ class DeepGalaxyTraining(object):
             base_model = efn.EfficientNetB4(weights=None, include_top=False, input_shape=self.input_shape, classes=self.num_classes)
             base_model.save('efn_b4.h5')
         else:
-            base_model = K.models.load_model('efn_b4.h5')
+            base_model = tf.keras.models.load_model('efn_b4.h5')
         if not self.use_noise:
             x = base_model.output
-            x = K.layers.GlobalAveragePooling2D()(x)
-            x = K.layers.Dropout(0.3)(x)
-            predictions = K.layers.Dense(self.num_classes, activation='softmax')(x)
-            model = K.models.Model(inputs = base_model.input, outputs = predictions)
+            x = tf.keras.layers.GlobalAveragePooling2D()(x)
+            x = tf.keras.layers.Dropout(0.3)(x)
+            predictions = tf.keras.layers.Dense(self.num_classes, activation='softmax')(x)
+            model = tf.keras.models.Model(inputs = base_model.input, outputs = predictions)
         else:
-            model = K.models.Sequential()
-            model.add(K.layers.GaussianNoise(0.5, input_shape=self.input_shape))
+            model = tf.keras.models.Sequential()
+            model.add(tf.keras.layers.GaussianNoise(0.5, input_shape=self.input_shape))
             model.add(base_model)
-            model.add(K.layers.GlobalAveragePooling2D(name="gap"))
-            model.add(K.layers.Dropout(0.3))
-            model.add(K.layers.Dense(self.num_classes, activation="softmax", name="fc_out"))
+            model.add(tf.keras.layers.GlobalAveragePooling2D(name="gap"))
+            model.add(tf.keras.layers.Dropout(0.3))
+            model.add(tf.keras.layers.Dense(self.num_classes, activation="softmax", name="fc_out"))
 
         if self.distributed_training is True:
             # opt = K.optimizers.SGD(0.001 * hvd.size())
-            opt = K.optimizers.Adam(hvd.size())
+            opt = tf.keras.optimizers.Adam(hvd.size())
             # Horovod: add Horovod Distributed Optimizer.
             opt = hvd.DistributedOptimizer(opt)
         else:
-            opt = K.optimizers.Adam()
+            opt = tf.keras.optimizers.Adam()
 
         if self.multi_gpu_training is True:
-            parallel_model = K.utils.multi_gpu_model(model, gpus=4)
-            parallel_model.compile(loss=K.losses.sparse_categorical_crossentropy,
+            parallel_model = tf.keras.utils.multi_gpu_model(model, gpus=4)
+            parallel_model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy,
                                    optimizer=opt,
                                    metrics=['sparse_categorical_accuracy'])
             self._multi_gpu_model = parallel_model
             self.model = model
             print(parallel_model.summary())
         else:
-            model.compile(loss=K.losses.sparse_categorical_crossentropy,
+            model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy,
                           optimizer=opt,
                           metrics=['sparse_categorical_accuracy'])
             self.model = model
-            print(model.summary())
+            # print(model.summary())
 
     def fit(self):
         if self.distributed_training is True:
@@ -162,10 +165,13 @@ class DeepGalaxyTraining(object):
                 # print('len(train_iter)', len(train_iter))
                 # if hvd.rank() == 0:
                     # self.f_usage.write('len(train_iter) = %d, x_train.shape=%s\n' % (len(train_iter), x_train.shape))
+                self._t_start = datetime.now()
                 self.model.fit(self.x_train, self.y_train, batch_size=self.batch_size,
                                epochs=self.epochs,
+                               callbacks=self.callbacks,
                                verbose=1 if hvd.rank()==0 else 0,
                                validation_data=(self.x_test, self.y_test))
+                self._t_end = datetime.now()
                 # train_gen = ImageDataGenerator()
                 # train_iter = train_gen.flow(self.x_train, self.y_train, batch_size=self.batch_size)
                 # test_gen = ImageDataGenerator()
@@ -183,27 +189,36 @@ class DeepGalaxyTraining(object):
                 print('Terminating due to Ctrl+C...')
             finally:
                 print("On hostname {0} - After training using {1} GB of memory".format(socket.gethostname(), psutil.Process(os.getpid()).memory_info()[0]/1024/1024/1024))
-                t_end = datetime.now()
+                self._t_end = datetime.now()
                 if hvd.rank() == 0:
                     self.f_usage.write("On hostname {0} - After training using {1} GB of memory\n".format(socket.gethostname(), psutil.Process(os.getpid()).memory_info()[0]/1024/1024/1024))
                     self.f_usage.write('Time is now %s\n' % datetime.now())
                     # self.f_usage.write('Elapsed time %s\n' % (t_end-t_start))
                     self.f_usage.flush()
-                t_end = datetime.now()
                 # print('Elapsed time:', t_end-t_start)
         else:
             try:
                 if self.multi_gpu_training is True:
-                    self._multi_gpu_model.fit(self.x_train, self.y_train, batch_size=self.batch_size, epochs=self.epochs,
-                                              callbacks=self.callbacks, verbose=1, validation_data=(self.x_test, self.y_test))
+                    self._t_start = datetime.now()
+                    self._multi_gpu_model.fit(self.x_train, self.y_train, batch_size=self.batch_size, 
+                                              epochs=self.epochs,
+                                            #   callbacks=self.callbacks, 
+                                              verbose=1, 
+                                              validation_data=(self.x_test, self.y_test))
+                    self._t_end = datetime.now()
                 else:
-                    self.model.fit(self.x_train, self.y_train, batch_size=self.batch_size, epochs=self.epochs,
-                                   callbacks=self.callbacks, verbose=1, validation_data=(self.x_test, self.y_test))
+                    self._t_start = datetime.now()
+                    self.model.fit(self.x_train, self.y_train, batch_size=self.batch_size, 
+                                   epochs=self.epochs,
+                                #    callbacks=self.callbacks, 
+                                   verbose=1, 
+                                   validation_data=(self.x_test, self.y_test))
+                    self._t_end = datetime.now()
             except KeyboardInterrupt:
                 pass
             finally:
-                t_end = datetime.now()
-                print('Elapsed time:', t_end-t_start)
+                self._t_end = datetime.now()
+                print('Elapsed time:', self._t_end - self._t_start)
                 print('Saving model...')
         print(self.get_flops(self.model))
 
@@ -226,7 +241,8 @@ class DeepGalaxyTraining(object):
 
 if __name__ == "__main__":
     dgtrain = DeepGalaxyTraining()
-    dgtrain.distributed_training = True
+    dgtrain.distributed_training = False 
+    dgtrain.multi_gpu_training = False 
     dgtrain.initialize()
     dgtrain.load_data('../output_bw_512.hdf5', dset_name_pattern='s_1_m_1*', camera_pos=[1,2,3])
     dgtrain.load_model()
