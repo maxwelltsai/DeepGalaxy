@@ -35,7 +35,7 @@ try:
 except ImportError as ie:
     pass
 
-# tf.compat.v1.disable_eager_execution()
+tf.compat.v1.disable_eager_execution()
 
 class DeepGalaxyTraining(object):
 
@@ -53,6 +53,7 @@ class DeepGalaxyTraining(object):
         self.distributed_training = False 
         self.multi_gpu_training = False
         self._multi_gpu_model = None
+        self._n_gpus = 1
         self.callbacks = []
         self.f_usage = None
         self.input_shape = (512, 512, 3)  # (256, 256, 3)
@@ -138,14 +139,21 @@ class DeepGalaxyTraining(object):
 
         if self.distributed_training is True:
             # opt = K.optimizers.SGD(0.001 * hvd.size())
-            opt = tf.keras.optimizers.Adam(hvd.size())
+            # opt = tf.keras.optimizers.Adam(hvd.size())
+            opt = tf.keras.optimizers.Adadelta(1.0 * hvd.size())
             # Horovod: add Horovod Distributed Optimizer.
             opt = hvd.DistributedOptimizer(opt)
         else:
             opt = tf.keras.optimizers.Adam()
 
         if self.multi_gpu_training is True:
-            parallel_model = tf.keras.utils.multi_gpu_model(model, gpus=4)
+            # probe the number of GPUs
+            from tensorflow.python.client import device_lib
+            local_device_protos = device_lib.list_local_devices()
+            gpu_list = [x.name for x in local_device_protos if x.device_type == 'GPU']
+            self._n_gpus = len(gpu_list)
+            print('Parallalizing the model on %d GPUs...' % self._n_gpus)
+            parallel_model = tf.keras.utils.multi_gpu_model(model, gpus=self._n_gpus)
             parallel_model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy,
                                    optimizer=opt,
                                    metrics=['sparse_categorical_accuracy'])
@@ -200,7 +208,8 @@ class DeepGalaxyTraining(object):
             try:
                 if self.multi_gpu_training is True:
                     self._t_start = datetime.now()
-                    self._multi_gpu_model.fit(self.x_train, self.y_train, batch_size=self.batch_size, 
+                    self._multi_gpu_model.fit(self.x_train, self.y_train, 
+                                              batch_size=self.batch_size * self._n_gpus, 
                                               epochs=self.epochs,
                                             #   callbacks=self.callbacks, 
                                               verbose=1, 
@@ -241,8 +250,8 @@ class DeepGalaxyTraining(object):
 
 if __name__ == "__main__":
     dgtrain = DeepGalaxyTraining()
-    dgtrain.distributed_training = False 
-    dgtrain.multi_gpu_training = False 
+    dgtrain.distributed_training = True  
+    dgtrain.multi_gpu_training = False
     dgtrain.initialize()
     dgtrain.load_data('../output_bw_512.hdf5', dset_name_pattern='s_1_m_1*', camera_pos=[1,2,3])
     dgtrain.load_model()
