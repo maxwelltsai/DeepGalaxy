@@ -47,8 +47,8 @@ class DeepGalaxyTraining(object):
         self.x_test = None
         self.y_test = None
         self.num_classes = 0
-        self.epochs = 12
-        self.batch_size = 4
+        self.epochs = 50
+        self.batch_size = 8
         self.use_noise = False 
         self.distributed_training = False 
         self.multi_gpu_training = False
@@ -75,7 +75,16 @@ class DeepGalaxyTraining(object):
         # init_op = tf.global_variables_initializer()
         # sess = tf.Session()
         # sess.run(init_op)
-
+        
+        # Check if GPUs are available
+        # if tf.test.is_gpu_available():
+        #     # allow growth
+        #     config = tf.ConfigProto()
+        #     config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+        #     config.log_device_placement = True  # to log device placement (on which device the operation ran)
+            
+        #     sess = tf.Session(config=config)
+        #     tf.keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
         if self.distributed_training is True:
             try:
                 import horovod.keras as hvd
@@ -87,6 +96,9 @@ class DeepGalaxyTraining(object):
                     self.f_usage = open('usage_%d_2048.txt' % hvd.size(), 'w')
                     # self.f_usage.write('batch_size: %d, global_batch_size: %d, num_workers, %d, N_train_batches: %d, N_test_batches: %d\n' % (self.batch_size, global_batch_size, hvd.size(), train_batches, 0))
                     self.f_usage.flush()
+                    
+                # Map an MPI process to a GPU (Important!)    
+                os.environ["CUDA_VISIBLE_DEVICES"] = str(hvd.local_rank())
             except ImportError as identifier:
                 print('Error importing horovod. Disabling distributed training.')
                 self.distributed_training = False
@@ -122,7 +134,7 @@ class DeepGalaxyTraining(object):
             base_model = efn.EfficientNetB4(weights=None, include_top=False, input_shape=self.input_shape, classes=self.num_classes)
             base_model.save('efn_b4.h5')
         else:
-            base_model = tf.keras.models.load_model('efn_b4.h5')
+            base_model = tf.keras.models.load_model('efn_b4.h5', compile=False)
         if not self.use_noise:
             x = base_model.output
             x = tf.keras.layers.GlobalAveragePooling2D()(x)
