@@ -78,19 +78,26 @@ class DataIO(object):
             selected_elems = self.dset_loc[idx_global_start:idx_global_end]
             selected_elems_idx_local = self.local_index[idx_global_start:idx_global_end]
             df = pd.DataFrame(data={'path': selected_elems, 'local_index': selected_elems_idx_local})
-            data_collective = []
+            data_collective = None
             for path_unique, local_id in df.groupby('path'):
                 local_id = local_id['local_index'].to_numpy()
                 print('[Rank = %d, N_p = %d] loading dataset: %s' % (hvd_rank, hvd_size, path_unique))
-                data_collective.append(self.load_dataset(path_unique)[local_id])
+                if data_collective is None:
+                    data_collective = self.load_dataset(path_unique)[local_id]
+                else:
+                    data_collective = np.append(data_collective, self.load_dataset(path_unique)[local_id], axis=0)
+                
+                # data_collective.append(self.load_dataset(path_unique)[local_id])
                 # if data_collective is None:
                 #     data_collective = self.load_dataset(path_unique)[local_id]
                 # else:
                 #     print('shape load', self.load_dataset(path_unique).shape)
                 #     data_collective = np.vstack([data_collective, self.load_dataset(path_unique)[local_id]])
                     
-            X = np.array(data_collective)
-            X = X.reshape(X.shape[0]*X.shape[1], X.shape[2], X.shape[3], X.shape[4])
+            # X = np.array(data_collective)
+            X = data_collective
+            print('X shape', X.shape, X[0].shape)
+            # X = X.reshape(X.shape[0]*X.shape[1], X.shape[2], X.shape[3], X.shape[4])
             Y = self.flattened_labels[idx_global_start:idx_global_end]
             return X, Y 
     
