@@ -112,9 +112,10 @@ class DataIO(object):
             images = images.astype(np.float) / 255
         elif images.shape[-1] == 1:
             # just gray scale float images. Repeat along the channel
-            old_shape = images.shape
-            images = np.repeat(images.astype(np.float32), 3, axis=(len(old_shape)-1))
-            print('Repeating...', old_shape, images.shape)
+            # old_shape = images.shape
+            # images = np.repeat(images.astype(np.float32), 3, axis=(len(old_shape)-1))
+            # print('Repeating...', old_shape, images.shape)
+            pass 
         return images 
     
     def flatten_index(self, h5fn, dset_name_pattern, camera_pos=0, t_lim=None):
