@@ -105,7 +105,7 @@ class DataIO(object):
         """
         Load a dataset according to the h5_path.
         """
-        images = self.h5f[h5_path].value 
+        images = self.h5f[h5_path][()]
         if images.dtype == np.uint8:
             # if uint8, then the range is [0, 255]. Normalize to [0, 1]
             # if float32, don't do anything since the range is already [0, 1]
@@ -146,7 +146,7 @@ class DataIO(object):
                 label_dset_path_full = '/%s/t_myr_camera_%02d' % (dset_name, cpos)
                 print('Obtaining the shape of dataset %s' % dset_path_full)
                 shape = self.h5f[dset_path_full].shape
-                labels = self.h5f[label_dset_path_full].value
+                labels = self.h5f[label_dset_path_full][()]
                 
                 labels_t_ = (labels / 5).astype(np.int)
                 labels_t_ = labels_t_ - np.min(labels_t_)

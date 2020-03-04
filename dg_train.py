@@ -11,6 +11,7 @@ Maxwell Cai (SURF), October - November 2019.
 
 # import keras as K
 import tensorflow as tf
+# tf.compat.v1.disable_eager_execution()
 # import efficientnet.keras_custom as efn
 import efficientnet.tfkeras as efn
 from skimage.io import imread
@@ -49,7 +50,7 @@ class DeepGalaxyTraining(object):
         self.y_test = None
         self.num_classes = 0
         self.epochs = 50
-        self.batch_size = 2
+        self.batch_size = 4
         self.use_noise = True
         self.distributed_training = False
         self.multi_gpu_training = False
@@ -63,11 +64,13 @@ class DeepGalaxyTraining(object):
         self._t_end = 0
 
     def get_flops(self, model):
-        run_meta = tf.RunMetadata()
-        opts = tf.profiler.ProfileOptionBuilder.float_operation()
+        # run_meta = tf.RunMetadata()  # commented out since it doesn't work in TF2
+        run_meta = tf.compat.v1.RunMetadata()
+        # opts = tf.profiler.ProfileOptionBuilder.float_operation()
+        opts = tf.compat.v1.profiler.ProfileOptionBuilder.float_operation()
 
         # We use the Keras session graph in the call to the profiler.
-        flops = tf.profiler.profile(graph=tf.keras.backend.get_session().graph,
+        flops = tf.compat.v1.profiler.profile(graph=tf.compat.v1.keras.backend.get_session().graph,
                                     run_meta=run_meta, cmd='op', options=opts)
 
         return flops.total_float_ops  # Prints the "flops" of the model.
@@ -79,14 +82,14 @@ class DeepGalaxyTraining(object):
         # sess.run(init_op)
 
         # Check if GPUs are available
-        # if tf.test.is_gpu_available():
-        #     # allow growth
-        #     config = tf.ConfigProto()
-        #     config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-        #     config.log_device_placement = True  # to log device placement (on which device the operation ran)
-
-        #     sess = tf.Session(config=config)
-        #     tf.keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
+        # if tf.test.is_gpu_available():  # commented out since this test will cause a new session be created
+        # allow growth
+        # config = tf.compat.v1.ConfigProto()
+        # config.gpu_options.per_process_gpu_memory_fraction = 1
+        # config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+        # # config.log_device_placement = True  # to log device placement (on which device the operation ran)
+        # sess = tf.compat.v1.Session(config=config)
+        # tf.compat.v1.keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
 
         # Create logger
         self.logger = logging.getLogger('DeepGalaxyTrain')
@@ -94,10 +97,11 @@ class DeepGalaxyTraining(object):
         self.logger.addHandler(logging.FileHandler('train_log.txt'))
         if self.distributed_training is True:
             try:
-                import horovod.keras as hvd
+                import horovod.tensorflow.keras as hvd
                 # initialize horovod
                 hvd.init()
                 self.callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
+                self.callbacks.append(hvd.callbacks.MetricAverageCallback())
                 # self.callbacks = [hvd.BroadcastGlobalVariablesHook(0)]
                 if hvd.rank() == 0:
                     self.logger.info('Parallel training enabled.')
@@ -109,6 +113,13 @@ class DeepGalaxyTraining(object):
 
                 # Bind a CUDA device to one MPI process (has no effect if GPUs are not used)
                 os.environ["CUDA_VISIBLE_DEVICES"] = str(hvd.local_rank())
+                
+                # # Horovod: pin GPU to be used to process local rank (one GPU per process)
+                gpus = tf.config.experimental.list_physical_devices('GPU')
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+                # if gpus:
+                    # tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
             except ImportError as identifier:
                 print('Error importing horovod. Disabling distributed training.')
                 self.distributed_training = False
@@ -156,15 +167,16 @@ class DeepGalaxyTraining(object):
             # model = tf.keras.models.Model(inputs = base_model.input, outputs = predictions)
             # model = tf.keras.models.Model(inputs = base_model.input, outputs = base_model.outputs)
             model = tf.keras.models.Sequential()
-            model.add(tf.keras.layers.Lambda(lambda x: tf.repeat(x, 3, axis=-1), input_shape=self.input_shape))
+            # model.add(tf.keras.layers.Lambda(lambda x: tf.repeat(x, 3, axis=-1), input_shape=self.input_shape))  # commented out since tf.repeat does not exist before 1.15
+            model.add(tf.keras.layers.Lambda(lambda x: tf.keras.backend.repeat_elements(x, 3, axis=-1), input_shape=self.input_shape))
             model.add(base_model)
             model.add(tf.keras.layers.GlobalAveragePooling2D())
             model.add(tf.keras.layers.Dropout(0.3))
             model.add(tf.keras.layers.Dense(self.num_classes, activation='softmax'))
-            # model.add(base_model)
         else:
             model = tf.keras.models.Sequential()
-            model.add(tf.keras.layers.Lambda(lambda x: tf.repeat(x, 3, axis=-1), input_shape=self.input_shape))
+            # model.add(tf.keras.layers.Lambda(lambda x: tf.repeat(x, 3, axis=-1), input_shape=self.input_shape))  # commented out since tf.repeat does not exist before 1.15
+            model.add(tf.keras.layers.Lambda(lambda x: tf.keras.backend.repeat_elements(x, 3, axis=-1), input_shape=self.input_shape))
             model.add(tf.keras.layers.GaussianNoise(0.5, input_shape=self.input_shape))
             model.add(base_model)
             model.add(tf.keras.layers.GlobalAveragePooling2D(name="gap"))
@@ -197,7 +209,7 @@ class DeepGalaxyTraining(object):
         else:
             model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy,
                           optimizer=opt,
-                          metrics=['sparse_categorical_accuracy'])
+                          metrics=['sparse_categorical_accuracy'], experimental_run_tf_function=False)
             self.model = model
             if self.distributed_training is True:
                 if hvd.rank() == 0:
@@ -289,10 +301,11 @@ if __name__ == "__main__":
     dgtrain = DeepGalaxyTraining()
     dgtrain.distributed_training = True
     dgtrain.multi_gpu_training = False
+    dgtrain.use_noise = True
     dgtrain.initialize()
-    # dgtrain.load_data('../output_bw_512.hdf5', dset_name_pattern='s_1_m_1*', camera_pos=[1,2,3])
+    dgtrain.load_data('../output_bw_512.hdf5', dset_name_pattern='s_1_m_1*', camera_pos=[1,2,3])
     # dgtrain.load_data('../output_bw_512.hdf5', dset_name_pattern='s_*', camera_pos='*')
-    dgtrain.load_data('../output_bw_1024.hdf5', dset_name_pattern='s_*', camera_pos='*')
+    # dgtrain.load_data('../output_bw_1024.hdf5', dset_name_pattern='s_*', camera_pos='*')
     dgtrain.load_model()
     dgtrain.fit()
     dgtrain.save_model()
