@@ -113,7 +113,7 @@ class DeepGalaxyTraining(object):
 
                 # Bind a CUDA device to one MPI process (has no effect if GPUs are not used)
                 os.environ["CUDA_VISIBLE_DEVICES"] = str(hvd.local_rank())
-                
+
                 # # Horovod: pin GPU to be used to process local rank (one GPU per process)
                 gpus = tf.config.experimental.list_physical_devices('GPU')
                 for gpu in gpus:
@@ -155,10 +155,11 @@ class DeepGalaxyTraining(object):
 
     def load_model(self):
         if not os.path.isfile('efn_b4.h5'):
-            base_model = efn.EfficientNetB4(weights=None, include_top=True, input_shape=self.input_shape, classes=self.num_classes)
+            base_model = efn.EfficientNetB4(weights=None, include_top=True, input_shape=(self.input_shape[0], self.input_shape[1], 3), classes=self.num_classes)
             base_model.save('efn_b4.h5')
         else:
             base_model = tf.keras.models.load_model('efn_b4.h5', compile=False)
+        print(base_model.summary())
         if not self.use_noise:
             # x = base_model.output
             # x = tf.keras.layers.GlobalAveragePooling2D()(x)
@@ -170,18 +171,18 @@ class DeepGalaxyTraining(object):
             # model.add(tf.keras.layers.Lambda(lambda x: tf.repeat(x, 3, axis=-1), input_shape=self.input_shape))  # commented out since tf.repeat does not exist before 1.15
             model.add(tf.keras.layers.Lambda(lambda x: tf.keras.backend.repeat_elements(x, 3, axis=-1), input_shape=self.input_shape))
             model.add(base_model)
-            model.add(tf.keras.layers.GlobalAveragePooling2D())
-            model.add(tf.keras.layers.Dropout(0.3))
-            model.add(tf.keras.layers.Dense(self.num_classes, activation='softmax'))
+            # model.add(tf.keras.layers.GlobalAveragePooling2D())
+            # model.add(tf.keras.layers.Dropout(0.3))
+            # model.add(tf.keras.layers.Dense(self.num_classes, activation='softmax'))
         else:
             model = tf.keras.models.Sequential()
             # model.add(tf.keras.layers.Lambda(lambda x: tf.repeat(x, 3, axis=-1), input_shape=self.input_shape))  # commented out since tf.repeat does not exist before 1.15
             model.add(tf.keras.layers.Lambda(lambda x: tf.keras.backend.repeat_elements(x, 3, axis=-1), input_shape=self.input_shape))
             model.add(tf.keras.layers.GaussianNoise(0.5, input_shape=self.input_shape))
             model.add(base_model)
-            model.add(tf.keras.layers.GlobalAveragePooling2D(name="gap"))
-            model.add(tf.keras.layers.Dropout(0.3))
-            model.add(tf.keras.layers.Dense(self.num_classes, activation="softmax", name="fc_out"))
+            # model.add(tf.keras.layers.GlobalAveragePooling2D(name="gap"))
+            # model.add(tf.keras.layers.Dropout(0.3))
+            # model.add(tf.keras.layers.Dense(self.num_classes, activation="softmax", name="fc_out"))
 
         if self.distributed_training is True:
             # opt = K.optimizers.SGD(0.001 * hvd.size())
