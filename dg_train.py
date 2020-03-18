@@ -210,7 +210,7 @@ class DeepGalaxyTraining(object):
         else:
             model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy,
                           optimizer=opt,
-                          metrics=['sparse_categorical_accuracy'], experimental_run_tf_function=False)
+                          metrics=['sparse_categorical_accuracy'])
             self.model = model
             if self.distributed_training is True:
                 if hvd.rank() == 0:
