@@ -6,7 +6,7 @@ In this project, a deep convolutional neural network (CNN) is trained with visua
 
 The simulations are carried out using `Bonsai` (Bédorf et al., 2012, 2019), a GPU-accelerated Barnes-Hut tree code. GitHub: https://github.com/treecode/Bonsai. 
 
-The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan & Le, 2019)](https://arxiv.org/abs/1905.11946) and [ResNet (He et al. 2019)](https://arxiv.org/abs/1512.03385). The `EfficientNet` implementation is based on [this repository](https://github.com/qubvel/efficientnet). The implementations of other CNNs (including `ResNet50`) are based on the `tf.keras.application` module. A full list of supported CNNs can be found at https://www.tensorflow.org/api_docs/python/tf/keras/applications.
+The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan & Le, 2019)](https://arxiv.org/abs/1905.11946) and [ResNet (He et al. 2019)](https://arxiv.org/abs/1512.03385). The `EfficientNet` implementation is based on [this repository](https://github.com/qubvel/efficientnet). The implementations of other CNNs (including `ResNet50`) are based on the `tf.keras.applications` module. A full list of supported CNNs can be found at https://www.tensorflow.org/api_docs/python/tf/keras/applications.
 
 
 
