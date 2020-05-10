@@ -1,10 +1,9 @@
 """
 Deep Galaxy Training code.
 
-Maxwell Cai (SURF), October - November 2019.
+Maxwell Cai (SURF), October 2019 - May 2020.
 
-# Dynamic loading of training data
-# Integrate the parallel version with the single-core version
+# Dynamically creating training sessions with commandline arguments.
 """
 
 import argparse 
