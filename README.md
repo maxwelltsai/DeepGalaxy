@@ -31,7 +31,7 @@ The training can be done on a single node or multiple nodes. If you are running 
 
 - `-f <dataset.hdf5>`: the file name and path of the HDF5 image dataset (required).
 - `--epochs`: The number of epoches to carry out the training. 
-- `--arch`: the CNN architecture to use, e.g., `EfficientNetB4`, `EfficientNetB7`, `ResNet50`.
+- `--arch`: the CNN architecture to use, e.g., `EfficientNetB4`, `EfficientNetB7`, `ResNet50` (case sensitive). A list of supported architectures can be found at https://www.tensorflow.org/api_docs/python/tf/keras/applications.
 - `--batch-size`: the batch size to use in the training. Usually this is constrained by the size of (GPU) memory.
 - `--num-camera`: the number of camera positions to use for data augmentation. An integer from 1 to 14 is acceptable.
 - `-d`: datasets to use for training. To use all datasets stored in the HDF5 file, type `s_*`. To include datasets only with size ratio of 1.5, type `s_1.5_*`, and so on.
