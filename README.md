@@ -10,7 +10,6 @@ The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan
 
 
 
-
 ## Prerequisites
 - TensorFlow (1.14 or above, 2.1 or above)
 - Scikit-learn
