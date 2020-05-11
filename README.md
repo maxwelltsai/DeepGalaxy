@@ -1,4 +1,4 @@
-di# DeepGalaxy: Classifying the properties of galaxy mergers using Deep Convolutional Networks
+# DeepGalaxy: Classifying the properties of galaxy mergers using Deep Convolutional Networks
 
 This project aims to leverage the capability of pattern recognization in modern deep learning to classify the properties of galaxy mergers. Galaxy mergers (the dynamical process during which two galaxies collide) are among the most spectacular phenomena in the Universe. During the merger process, the two interacting galaxies are tidally distorted, producing elongated shaped galaxies with tidal arms. Many irregular galaxies are created through this mechanism, and the evolving visual feature in this dynamic process can be considered as an image classification problem in the fields of computer vision and machine learning.
 
@@ -52,6 +52,8 @@ Multi-node training relies on [`horovod`](https://github.com/horovod/horovod), a
 mpirun -np 32 python dg_train.py -f output_bw_512.hdf5 --epochs 20 --noise 0.3
 ```
 where `-np 32` should be changed according to the actual number of MPI processes. For example, if 8 nodes are allocated, and each node with 4 processors (e.g., GPU), then `np = 8 * 4 = 32`. If GPUs are used, `DeepGalaxy` will automatically bind each MPI process to a GPU.  Please replace `output_bw_512.hdf5` with the actual file name of the HDF5 dataset. Change the epochs and noise, and other parameters whenever necessary.
+
+
 
 ## Acknowledgement
 This project is supported by [PRACE](https://prace-ri.eu/), [SURF](https://www.surf.nl/en), and [Leiden Observatory](https://www.universiteitleiden.nl/en/science/astronomy).
