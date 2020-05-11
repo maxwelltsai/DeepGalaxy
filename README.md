@@ -15,6 +15,7 @@ The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan
 - Scikit-learn
 - Scikit-image
 - h5py
+- Horovod (optional; 0.19 or above)
 
 It is recommended to install these package in a Python virtual environment.
 
@@ -53,7 +54,10 @@ mpirun -np 32 python dg_train.py -f output_bw_512.hdf5 --epochs 20 --noise 0.3
 ```
 where `-np 32` should be changed according to the actual number of MPI processes. For example, if 8 nodes are allocated, and each node with 4 processors (e.g., GPU), then `np = 8 * 4 = 32`. If GPUs are used, `DeepGalaxy` will automatically bind each MPI process to a GPU.  Please replace `output_bw_512.hdf5` with the actual file name of the HDF5 dataset. Change the epochs and noise, and other parameters whenever necessary.
 
+## Large models
+When high-resolution images are trained on a large DNN, the memory consumption of the DNN parameters and activation maps may (far) exceed the available GPU memory. In this case, it is still possible to map the host memory to the GPUs. This can be done by passing a value greater than 1 to the `--gpu-mem-frac` argument. For example, `--gpu-mem-frac 5` means that it allows CUDA to allocate 5 times the size of the GPU memory. So if the GPU memory is 32 GB, then the usable memory for the GPU in this case will be 160 GB.
 
+Please note that this option usually comes with performance penalty. 
 
 ## Acknowledgement
 This project is supported by [PRACE](https://prace-ri.eu/), [SURF](https://www.surf.nl/en), and [Leiden Observatory](https://www.universiteitleiden.nl/en/science/astronomy).
