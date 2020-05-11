@@ -21,7 +21,7 @@ import os
 from datetime import datetime
 import psutil
 import socket
-from tf.keras.callbacks import Callback
+from tensorflow.keras.callbacks import Callback
 import time
 import argparse
 import logging
@@ -50,6 +50,8 @@ class DeepGalaxyTraining(object):
         self.base_model_name = 'EfficientNetB4'
         self.distributed_training = False
         self.multi_gpu_training = False
+        self._gpu_memory_allow_growth = False
+        self._gpu_memory_fraction = None  # a number greater than 1 means that unified memory will be used; set to None for automatic handling
         self._multi_gpu_model = None
         self._n_gpus = 1
         self.callbacks = []
@@ -110,12 +112,19 @@ class DeepGalaxyTraining(object):
                 # Bind a CUDA device to one MPI process (has no effect if GPUs are not used)
                 os.environ["CUDA_VISIBLE_DEVICES"] = str(hvd.local_rank())
 
-                # # Horovod: pin GPU to be used to process local rank (one GPU per process)
                 gpus = tf.config.experimental.list_physical_devices('GPU')
                 for gpu in gpus:
-                    tf.config.experimental.set_memory_growth(gpu, True)
-                # if gpus:
-                    # tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
+                    tf.config.experimental.set_memory_growth(gpu, self._gpu_memory_allow_growth)
+                    # gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=self._gpu_memory_fraction)
+                    # try:
+                    #     tf.config.experimental.set_virtual_device_configuration(gpu, [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=102400)])
+                    # except RuntimeError as e:
+                    #     print(e)
+                if self._gpu_memory_fraction is not None:
+                    config = tf.compat.v1.ConfigProto()
+                    config.gpu_options.per_process_gpu_memory_fraction = self._gpu_memory_fraction
+                    # config.gpu_options.allow_growth = self._gpu_memory_allow_growth
+                    session = tf.compat.v1.InteractiveSession(config=config)
             except ImportError as identifier:
                 print('Error importing horovod. Disabling distributed training.')
                 self.distributed_training = False
@@ -286,15 +295,15 @@ class DeepGalaxyTraining(object):
     def save_model(self):
         if self.distributed_training is True:
             if hvd.rank() == 0:
-                if self.use_noise is True:
-                    self.model.save('model_hvd_bw_%d_B4_with_noise_n_p_%d.h5' % (self.input_shape[0], hvd.size()))
+                if self.noise_stddev > 0 is True:
+                    self.model.save('model_%d_%s_noise_np_%d.h5' % (self.input_shape[0], self.base_model_name, hvd.size()))
                 else:
-                    self.model.save('model_hvd_bw_%d_B4_no_noise_%d_nodes.h5' % (self.input_shape[0], hvd.size()))
+                    self.model.save('model_%d_%s_np_%d.h5' % (self.input_shape[0], self.base_model_name, hvd.size()))
         else:
-            if self.use_noise is True:
-                self.model.save('model_bw_%d_B4_with_noise.h5' % (self.input_shape[0]))
+            if self.noise_stddev > 0 is True:
+                self.model.save('model_%d_%s_noise.h5' % (self.input_shape[0], self.base_model_name))
             else:
-                self.model.save('model_bw_%d_B4_no_noise.h5' % (self.input_shape[0]))
+                self.model.save('model_%d_%s.h5' % (self.input_shape[0], self.base_model_name))
 
     def finalize(self):
         pass
