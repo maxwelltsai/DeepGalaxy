@@ -38,6 +38,7 @@ if __name__ == "__main__":
     dgtrain.base_model_name = args.dnn_arch
     dgtrain.noise_stddev = args.noise_stddev
     dgtrain.batch_size = args.batch_size 
+    dgtrain.learning_rate = args.lr 
     dgtrain.epochs = args.epochs
     dgtrain._gpu_memory_allow_growth = args.allow_growth
     if args.gpu_mem_frac is None:

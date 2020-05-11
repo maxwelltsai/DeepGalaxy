@@ -47,6 +47,7 @@ class DeepGalaxyTraining(object):
         self.epochs = 50
         self.batch_size = 4
         self.noise_stddev = 0.3
+        self.learning_rate = 1.0  # depends on the optimizer
         self.base_model_name = 'EfficientNetB4'
         self.distributed_training = False
         self.multi_gpu_training = False
@@ -115,6 +116,7 @@ class DeepGalaxyTraining(object):
                 gpus = tf.config.experimental.list_physical_devices('GPU')
                 for gpu in gpus:
                     tf.config.experimental.set_memory_growth(gpu, self._gpu_memory_allow_growth)
+                    tf.config.experimental.set_visible_devices(gpu, 'GPU')
                     # gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=self._gpu_memory_fraction)
                     # try:
                     #     tf.config.experimental.set_virtual_device_configuration(gpu, [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=102400)])
@@ -198,7 +200,7 @@ class DeepGalaxyTraining(object):
         if self.distributed_training is True:
             # opt = K.optimizers.SGD(0.001 * hvd.size())
             # opt = tf.keras.optimizers.Adam(hvd.size())
-            opt = tf.keras.optimizers.Adadelta(1.0 * hvd.size())
+            opt = tf.keras.optimizers.Adadelta(self.learning_rate * hvd.size())
             # Horovod: add Horovod Distributed Optimizer.
             opt = hvd.DistributedOptimizer(opt)
         else:
