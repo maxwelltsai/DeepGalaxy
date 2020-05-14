@@ -4,7 +4,7 @@ This project aims to leverage the capability of pattern recognization in modern 
 
 In this project, a deep convolutional neural network (CNN) is trained with visualization of galaxy merger simulations. Accordingly, the dynamical properties (e.g., the timescale in which two galaxies collide) are obtained from the numerical simulations, which are then encoded as the labels (in the supervised learning process). 
 
-The simulations are carried out using `Bonsai` (Bédorf et al., 2012, 2019), a GPU-accelerated Barnes-Hut tree code. GitHub: https://github.com/treecode/Bonsai. 
+The simulations are carried out using [`Bonsai`](https://github.com/treecode/Bonsai) (Bédorf et al., 2012, 2019), a GPU-accelerated Barnes-Hut tree code. 
 
 The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan & Le, 2019)](https://arxiv.org/abs/1905.11946) and [ResNet (He et al. 2019)](https://arxiv.org/abs/1512.03385). The `EfficientNet` implementation is based on [this repository](https://github.com/qubvel/efficientnet). The implementations of other CNNs (including `ResNet50`) are based on the `tf.keras.applications` module. A full list of supported CNNs can be found at https://www.tensorflow.org/api_docs/python/tf/keras/applications.
 
@@ -60,7 +60,7 @@ When high-resolution images are trained on a large DNN, the memory consumption o
 Please note that this option usually comes with performance penalty. 
 
 ## Acknowledgement
-This project is supported by [PRACE](https://prace-ri.eu/), [SURF](https://www.surf.nl/en), [Intel PCC](https://software.intel.com/content/www/us/en/develop/topics/parallel-computing-centers.html) and [Leiden Observatory](https://www.universiteitleiden.nl/en/science/astronomy).
+This project is supported by [PRACE](https://prace-ri.eu/), [SURF](https://www.surf.nl/en), [Intel PCC](https://software.intel.com/content/www/us/en/develop/topics/parallel-computing-centers.html), and [Leiden Observatory](https://www.universiteitleiden.nl/en/science/astronomy).
 
 ## Contact
 Questions/comments please direct to Maxwell X. Cai: maxwell.cai _at_ surfsara.nl
