@@ -25,7 +25,7 @@ from tensorflow.keras.callbacks import Callback
 import time
 import argparse
 import logging
-import importlib 
+import importlib
 
 try:
     import horovod.keras as hvd
@@ -90,10 +90,8 @@ class DeepGalaxyTraining(object):
         # sess = tf.compat.v1.Session(config=config)
         # tf.compat.v1.keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
 
-        # Create logger
-        self.logger = logging.getLogger('DeepGalaxyTrain')
-        self.logger.setLevel(self.log_level)
-        self.logger.addHandler(logging.FileHandler('train_log.txt'))
+        tf.keras.backend.set_image_data_format('channels_last')
+
         if self.distributed_training is True:
             try:
                 import horovod.tensorflow.keras as hvd
@@ -103,12 +101,17 @@ class DeepGalaxyTraining(object):
                 self.callbacks.append(hvd.callbacks.MetricAverageCallback())
                 # self.callbacks = [hvd.BroadcastGlobalVariablesHook(0)]
                 if hvd.rank() == 0:
+                    # Create logger
+                    self.logger = logging.getLogger('DeepGalaxyTrain')
+                    self.logger.setLevel(self.log_level)
+                    self.logger.addHandler(logging.FileHandler('train_log.txt'))
                     self.logger.info('Parallel training enabled.')
                     self.logger.info('batch_size = %d, global_batch_size = %d, num_workers = %d\n' % (self.batch_size, self.batch_size*hvd.size(), hvd.size()))
 
                 # Map an MPI process to a GPU (Important!)
                 print('hvd_rank = %d, hvd_local_rank = %d' % (hvd.rank(), hvd.local_rank()))
-                self.logger.info('hvd_rank = %d, hvd_local_rank = %d' % (hvd.rank(), hvd.local_rank()))
+                if hvd.rank() == 0:
+                    self.logger.info('hvd_rank = %d, hvd_local_rank = %d' % (hvd.rank(), hvd.local_rank()))
 
                 # Bind a CUDA device to one MPI process (has no effect if GPUs are not used)
                 os.environ["CUDA_VISIBLE_DEVICES"] = str(hvd.local_rank())
@@ -130,7 +133,16 @@ class DeepGalaxyTraining(object):
             except ImportError as identifier:
                 print('Error importing horovod. Disabling distributed training.')
                 self.distributed_training = False
+                self.logger = logging.getLogger('DeepGalaxyTrain')
+                self.logger.setLevel(self.log_level)
+                self.logger.addHandler(logging.FileHandler('train_log.txt'))
+                self.logger.info('Parallel training disabled.')
+                self.logger.info('Batch_size = %d' % (self.batch_size))
         else:
+            # Create logger
+            self.logger = logging.getLogger('DeepGalaxyTrain')
+            self.logger.setLevel(self.log_level)
+            self.logger.addHandler(logging.FileHandler('train_log.txt'))
             self.logger.info('Parallel training disabled.')
             self.logger.info('Batch_size = %d' % (self.batch_size))
 
@@ -139,11 +151,14 @@ class DeepGalaxyTraining(object):
         if not self.distributed_training:
             self.logger.info('Loading the full dataset since distributed training is disabled ...')
             X, Y = self.data_io.load_all(data_fn, dset_name_pattern=dset_name_pattern, camera_pos=camera_pos)
+            self.logger.debug('Shape of X: %s' % str(X.shape))
+            self.logger.debug('Shape of Y: %s' % str(Y.shape))
         else:
-            self.logger.info('Loading part of the dataset since distributed training is enabled ...')
             X, Y = self.data_io.load_partial(data_fn, dset_name_pattern=dset_name_pattern, camera_pos=camera_pos, hvd_size=hvd.size(), hvd_rank=hvd.rank())
-        self.logger.debug('Shape of X: %s' % str(X.shape))
-        self.logger.debug('Shape of Y: %s' % str(Y.shape))
+            if hvd.rank() == 0:
+                self.logger.info('Loading part of the dataset since distributed training is enabled ...')
+                self.logger.debug('Shape of X: %s' % str(X.shape))
+                self.logger.debug('Shape of Y: %s' % str(Y.shape))
 
         # update the input_shape setting according to the loaded data
         self.input_shape = X.shape[1:]
@@ -158,7 +173,11 @@ class DeepGalaxyTraining(object):
             self.x_train = X
             self.y_train = Y
         self.num_classes = np.unique(Y).shape[0]
-        self.logger.debug('Number of classes: %d' % self.num_classes)
+        if not self.distributed_training:
+            self.logger.debug('Number of classes: %d' % self.num_classes)
+        else:
+            if hvd.rank() == 0:
+                self.logger.debug('Number of classes: %d' % self.num_classes)
 
     def load_model(self):
         # if not os.path.isfile('efn_b4.h5'):
@@ -166,7 +185,7 @@ class DeepGalaxyTraining(object):
         #     base_model.save('efn_b4.h5')
         # else:
         #     base_model = tf.keras.models.load_model('efn_b4.h5', compile=False)
-            
+
         if 'EfficientNet' in self.base_model_name:
             base_model = getattr(efn, self.base_model_name)(weights=None, include_top=True, input_shape=(self.input_shape[0], self.input_shape[1], 3), classes=self.num_classes)
         else:
