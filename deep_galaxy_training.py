@@ -15,7 +15,7 @@ from skimage.io import imread
 from efficientnet.tfkeras import center_crop_and_resize, preprocess_input
 import numpy as np
 import pandas as pd
-from data_io import DataIO
+from data_io_new import DataIO
 from sklearn.model_selection import train_test_split
 import os
 from datetime import datetime
@@ -25,7 +25,7 @@ from tensorflow.keras.callbacks import Callback
 import time
 import argparse
 import logging
-import importlib
+from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
 try:
     import horovod.keras as hvd
@@ -91,6 +91,12 @@ class DeepGalaxyTraining(object):
         # tf.compat.v1.keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
 
         tf.keras.backend.set_image_data_format('channels_last')
+        # policy = mixed_precision.Policy('mixed_float16')
+        # mixed_precision.set_policy(policy)
+        # print('Compute dtype: %s' % policy.compute_dtype)
+        # print('Variable dtype: %s' % policy.variable_dtype)
+
+
 
         if self.distributed_training is True:
             try:

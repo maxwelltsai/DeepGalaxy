@@ -27,7 +27,7 @@ if __name__ == "__main__":
     parser.add_argument('--gpu-mem-frac', dest='gpu_mem_frac', type=float, default=None, help='Fraction of GPU memory to allocate per process. If None, this is handled automaticaly. If a number > 1 is given, unified memory is used.')
     parser.add_argument('--no-distributed', dest='distributed', action='store_false', help='Turn off Horovid distributed training')
     parser.add_argument('--noise', dest='noise_stddev', type=float, default=0.2, help='The stddev of the Gaussian noise for mitigatyying overfitting')
-    parser.add_argument('--num-camera', dest='num_cam', type=int, default=3, help='Number of camera positions (for data augmentation). Choose an integer between 1 and 14')
+    parser.add_argument('--num-camera', dest='num_cam', type=int, default=14, help='Number of camera positions (for data augmentation). Choose an integer between 1 and 14')
     args = parser.parse_args()
 
     print(args)
@@ -46,7 +46,8 @@ if __name__ == "__main__":
     else:
         dgtrain._gpu_memory_fraction = float(args.gpu_mem_frac)
     dgtrain.initialize()
-    dgtrain.load_data(args.file_name, dset_name_pattern=args.datasets, camera_pos=range(1, args.num_cam+1))
+    dgtrain.load_data(args.file_name, dset_name_pattern=args.datasets, camera_pos=range(0, args.num_cam))
+    # dgtrain.load_data(args.file_name, dset_name_pattern=args.datasets, camera_pos=[1,2,3])
     dgtrain.load_model()
     dgtrain.fit()
     dgtrain.save_model()
