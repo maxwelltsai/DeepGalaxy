@@ -11,11 +11,14 @@ The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan
 
 
 ## Prerequisites
+- Python 3 (tested on Python 3.6 and 3.7)
 - TensorFlow (1.14 or above, 2.1 or above)
 - Scikit-learn
 - Scikit-image
+- OpenCV-Python
 - h5py
 - Horovod (optional; 0.19 or above)
+- MPI (OpenMPI/MPICH, required when Horovod is installed)
 
 It is recommended to install these packages in a Python virtual environment.
 
