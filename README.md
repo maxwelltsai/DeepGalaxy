@@ -39,6 +39,7 @@ The training can be done on a single node or multiple nodes. If you are running 
 - `--num-camera`: the number of camera positions to use for data augmentation. An integer from 1 to 14 is acceptable.
 - `-d`: datasets to use for training. To use all datasets stored in the HDF5 file, type `s_*`. To include datasets only with size ratio of 1.5, type `s_1.5_*`, and so on.
 - `--noise`: mitigating overfitting by imposing a random Gaussian noise. This argument specifies the standard derivation of the noise. 
+- `-m`: Reshuffle the training/testing dataset every `-m` epochs. This option is useful in distributed training, since a compute node will only load a fraction of the full dataset. If `-m` is set to 0, the training/testing data is loaded only once during the initialization phase of the code, and a compute node will never be able to see the data on other nodes. If `-m` is set to an integer larger than 0, it will trigger the data loading pipeline every `-m` epochs, allowing a node to access data that are previous on other nodes.
 
 
 ### Training on a single node.
