@@ -16,6 +16,7 @@ from efficientnet.tfkeras import center_crop_and_resize, preprocess_input
 import numpy as np
 import pandas as pd
 from data_io_new import DataIO
+from callbacks import DataReshuffleCallback
 from sklearn.model_selection import train_test_split
 import os
 from datetime import datetime
@@ -48,6 +49,7 @@ class DeepGalaxyTraining(object):
         self.batch_size = 4
         self.noise_stddev = 0.3
         self.learning_rate = 1.0  # depends on the optimizer
+        self.data_loading_mode = 0 
         self.base_model_name = 'EfficientNetB4'
         self.distributed_training = False
         self.multi_gpu_training = False
@@ -55,6 +57,9 @@ class DeepGalaxyTraining(object):
         self._gpu_memory_fraction = None  # a number greater than 1 means that unified memory will be used; set to None for automatic handling
         self._multi_gpu_model = None
         self._n_gpus = 1
+        self._data_fn = None
+        self._dset_name_pattern = None 
+        self._camera_pos = None 
         self.callbacks = []
         self.logger = None
         self.log_level = logging.DEBUG
@@ -75,37 +80,13 @@ class DeepGalaxyTraining(object):
         return flops.total_float_ops  # Prints the "flops" of the model.
 
     def initialize(self):
-        # init_op = tf.initialize_all_variables()
-        # init_op = tf.global_variables_initializer()
-        # sess = tf.Session()
-        # sess.run(init_op)
-
-        # Check if GPUs are available
-        # if tf.test.is_gpu_available():  # commented out since this test will cause a new session be created
-        # allow growth
-        # config = tf.compat.v1.ConfigProto()
-        # config.gpu_options.per_process_gpu_memory_fraction = 1
-        # config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-        # # config.log_device_placement = True  # to log device placement (on which device the operation ran)
-        # sess = tf.compat.v1.Session(config=config)
-        # tf.compat.v1.keras.backend.set_session(sess)  # set this TensorFlow session as the default session for Keras
-
         tf.keras.backend.set_image_data_format('channels_last')
-        # policy = mixed_precision.Policy('mixed_float16')
-        # mixed_precision.set_policy(policy)
-        # print('Compute dtype: %s' % policy.compute_dtype)
-        # print('Variable dtype: %s' % policy.variable_dtype)
-
-
 
         if self.distributed_training is True:
             try:
                 import horovod.tensorflow.keras as hvd
                 # initialize horovod
                 hvd.init()
-                self.callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
-                self.callbacks.append(hvd.callbacks.MetricAverageCallback())
-                # self.callbacks = [hvd.BroadcastGlobalVariablesHook(0)]
                 if hvd.rank() == 0:
                     # Create logger
                     self.logger = logging.getLogger('DeepGalaxyTrain')
@@ -121,21 +102,22 @@ class DeepGalaxyTraining(object):
 
                 # Bind a CUDA device to one MPI process (has no effect if GPUs are not used)
                 os.environ["CUDA_VISIBLE_DEVICES"] = str(hvd.local_rank())
+                
+                # Add callbacks
+                self.callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
+                self.callbacks.append(hvd.callbacks.MetricAverageCallback())
+                self.callbacks.append(DataReshuffleCallback(self))
 
+                # Configure GPUs (if any)
                 gpus = tf.config.experimental.list_physical_devices('GPU')
                 for gpu in gpus:
                     tf.config.experimental.set_memory_growth(gpu, self._gpu_memory_allow_growth)
                     tf.config.experimental.set_visible_devices(gpu, 'GPU')
-                    # gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=self._gpu_memory_fraction)
-                    # try:
-                    #     tf.config.experimental.set_virtual_device_configuration(gpu, [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=102400)])
-                    # except RuntimeError as e:
-                    #     print(e)
                 if self._gpu_memory_fraction is not None:
                     config = tf.compat.v1.ConfigProto()
                     config.gpu_options.per_process_gpu_memory_fraction = self._gpu_memory_fraction
-                    # config.gpu_options.allow_growth = self._gpu_memory_allow_growth
                     session = tf.compat.v1.InteractiveSession(config=config)
+                    
             except ImportError as identifier:
                 print('Error importing horovod. Disabling distributed training.')
                 self.distributed_training = False
@@ -153,14 +135,25 @@ class DeepGalaxyTraining(object):
             self.logger.info('Batch_size = %d' % (self.batch_size))
 
 
-    def load_data(self, data_fn, dset_name_pattern, camera_pos, test_size=0.2, random=True):
+    def load_data(self, data_fn=None, dset_name_pattern=None, camera_pos=None, test_size=0.2, random=True):
+        if data_fn is not None and dset_name_pattern is not None and camera_pos is not None:
+            self._data_fn = data_fn
+            self._dset_name_pattern = dset_name_pattern
+            self._camera_pos = camera_pos
+        elif self._data_fn is not None and self._dset_name_pattern is not None and self._camera_pos is not None:
+            data_fn = self._data_fn
+            dset_name_pattern = self._dset_name_pattern
+            camera_pos = self._camera_pos
+        else:
+            raise ValueError('The data_fn, dset_name_pattern, camera_pos arguments should be specified.')
+            
         if not self.distributed_training:
             self.logger.info('Loading the full dataset since distributed training is disabled ...')
-            X, Y = self.data_io.load_all(data_fn, dset_name_pattern=dset_name_pattern, camera_pos=camera_pos)
+            X, Y, self.num_classes = self.data_io.load_all(data_fn, dset_name_pattern=dset_name_pattern, camera_pos=camera_pos)
             self.logger.debug('Shape of X: %s' % str(X.shape))
             self.logger.debug('Shape of Y: %s' % str(Y.shape))
         else:
-            X, Y = self.data_io.load_partial(data_fn, dset_name_pattern=dset_name_pattern, camera_pos=camera_pos, hvd_size=hvd.size(), hvd_rank=hvd.rank())
+            X, Y, self.num_classes = self.data_io.load_partial(data_fn, dset_name_pattern=dset_name_pattern, camera_pos=camera_pos, hvd_size=hvd.size(), hvd_rank=hvd.rank())
             if hvd.rank() == 0:
                 self.logger.info('Loading part of the dataset since distributed training is enabled ...')
                 self.logger.debug('Shape of X: %s' % str(X.shape))
@@ -178,7 +171,6 @@ class DeepGalaxyTraining(object):
         else:
             self.x_train = X
             self.y_train = Y
-        self.num_classes = np.unique(Y).shape[0]
         if not self.distributed_training:
             self.logger.debug('Number of classes: %d' % self.num_classes)
         else:

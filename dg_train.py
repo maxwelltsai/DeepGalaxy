@@ -20,7 +20,8 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--datasets', dest='datasets', type=str, default='s_1_m_1*', help='Name pattern of the selected datasets (supports regexp)')
     parser.add_argument('-o', '--optimizer', dest='optimizer', type=str, default='Adadelta', help='Optimizer for the gradient descent')
     parser.add_argument('-l', '--learning-rate', dest='lr', type=float, default=1, help='Learning rate (depends on the optimizer)')
-    parser.add_argument('--batch-size', dest='batch_size', type=int, default=4, help='batch size')
+    parser.add_argument('-m', '--data-loading-mode', dest='data_loading_mode', type=int, default=0, help='Data loading model. -1: load the full dataset of each compute node; 0: each node loads a fraction of the full dataste according to the MPI rank and size; >0: each node loads a fraction of the full dataset, and reload+shuffle the fraction per every -m epochs')
+    parser.add_argument('--batch-size', dest='batch_size', type=int, default=4, help='batch size (per processor)')
     parser.add_argument("--multi-gpu", type=bool, nargs='?', const=True, default=False, help="Use Keras multi_gpu API (depreciated)")
     parser.add_argument('--distributed', dest='distributed', action='store_true', default=True, help='Turn on Horovod distributed training')
     parser.add_argument('--allow-growth', dest='allow_growth', action='store_true', default=True, help='Allow GPU memory to grow dypnamically according to the size of the model.')
@@ -40,6 +41,7 @@ if __name__ == "__main__":
     dgtrain.batch_size = args.batch_size
     dgtrain.learning_rate = args.lr
     dgtrain.epochs = args.epochs
+    dgtrain.data_loading_mode = args.data_loading_mode
     dgtrain._gpu_memory_allow_growth = args.allow_growth
     if args.gpu_mem_frac is None:
         dgtrain._gpu_memory_fraction = None

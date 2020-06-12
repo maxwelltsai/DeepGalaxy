@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd 
 import h5py
 import re
-import sklearn
+from sklearn.preprocessing import LabelEncoder
 
 
 class DataIO(object):
@@ -11,6 +11,7 @@ class DataIO(object):
         self.dset_loc = None  # h5 path of the dataset (for partial loading)
         self.local_index = None  # index of an element within a h5 dataset
         self.flattened_labels = None 
+        self._partitioning_strategy = 1 # 0: linear; 1: random sampling 
 
     def load_all(self, h5fn, dset_name_pattern, camera_pos='*', t_lim=None):
         """
@@ -63,7 +64,9 @@ class DataIO(object):
             labels_s_set = np.concatenate(labels_s_set, axis=0)
             labels_t_set = np.concatenate(labels_t_set, axis=0)
             labels_cpos_set = np.concatenate(labels_cpos_set, axis=0)
-        return images_set, labels_t_set
+        
+        num_classes = np.unique(labels_t_set).shape[0]
+        return images_set, labels_t_set, num_classes
     
     def load_partial(self, h5fn, dset_name_pattern, camera_pos=0, t_lim=None, hvd_size=None, hvd_rank=None):
         """
@@ -72,38 +75,54 @@ class DataIO(object):
         if hvd_size is None or hvd_rank is None:
             return self.load_all(h5fn, dset_name_pattern, camera_pos, t_lim)
         else:
-            self.dset_loc, self.local_index, self.flattened_labels = self.flatten_index(h5fn, dset_name_pattern, camera_pos, t_lim, hvd_rank)
+            if self.dset_loc is None or self.local_index is None or self.flattened_labels is None:
+                self.dset_loc, self.local_index, self.flattened_labels = self.flatten_index(h5fn, dset_name_pattern, camera_pos, t_lim, hvd_rank)
             n_images_per_proc = int(len(self.dset_loc) / hvd_size)
             print('hvd_size = %d, n_images_per_proc = %d, total_images = %d' % (hvd_size, n_images_per_proc, len(self.dset_loc)))
-            idx_global_start = n_images_per_proc * hvd_rank
-            idx_global_end = n_images_per_proc * hvd_rank + n_images_per_proc
-            print('Rank %d gets %d images, from #%d to #%d' % (hvd_rank, n_images_per_proc, idx_global_start, idx_global_end))
-            selected_elems = self.dset_loc[idx_global_start:idx_global_end]
-            selected_elems_idx_local = self.local_index[idx_global_start:idx_global_end]
-            df = pd.DataFrame(data={'path': selected_elems, 'local_index': selected_elems_idx_local})
+            
+            if self._partitioning_strategy == 0:
+                # linear partitioning
+                idx_global_start = n_images_per_proc * hvd_rank
+                idx_global_end = n_images_per_proc * hvd_rank + n_images_per_proc
+                print('Rank %d gets %d images, from #%d to #%d' % (hvd_rank, n_images_per_proc, idx_global_start, idx_global_end))
+                selected_elems = self.dset_loc[idx_global_start:idx_global_end]
+                selected_elems_idx_local = self.local_index[idx_global_start:idx_global_end]
+                selected_elem_labels = self.flattened_labels[idx_global_start:idx_global_end]
+            elif self._partitioning_strategy == 1:
+                # random sampling
+                print('Rank %d gets %d images, sampled in random order from the full dataset...' % (hvd_rank, n_images_per_proc))
+                selected_elem_indices = np.random.randint(low=0, high=len(self.dset_loc), size=n_images_per_proc)
+                selected_elems = self.dset_loc[selected_elem_indices]
+                selected_elems_idx_local = self.local_index[selected_elem_indices]
+                selected_elem_labels = self.flattened_labels[selected_elem_indices]
+            
+            # group the elements from the same hdf5 dataset to ensure contiguous loading
+            df = pd.DataFrame(data={'path': selected_elems, 'local_index': selected_elems_idx_local, 'labels': selected_elem_labels})
             data_collective = None
-            for path_unique, local_id in df.groupby('path'):
-                local_id = local_id['local_index'].to_numpy()
-                print('[Rank = %d, N_p = %d] loading dataset: %s' % (hvd_rank, hvd_size, path_unique))
+            labels_collective = None 
+            for path_unique, group_data in df.groupby('path'):
+                local_id = group_data['local_index'].to_numpy()
+                local_labels = group_data['labels'].to_numpy()
+                print(local_id, local_labels)
+                print('[Rank = %d, N_p = %d] Sampling %d elements from dataset: %s' % (hvd_rank, hvd_size, local_id.shape[0], path_unique))
                 if data_collective is None:
                     print('id_local', local_id)
                     data_collective = self.load_dataset(path_unique)[local_id]
+                    labels_collective = local_labels
                 else:
                     data_collective = np.append(data_collective, self.load_dataset(path_unique)[local_id], axis=0)
+                    labels_collective = np.append(labels_collective, local_labels, axis=0)
                 
-                # data_collective.append(self.load_dataset(path_unique)[local_id])
-                # if data_collective is None:
-                #     data_collective = self.load_dataset(path_unique)[local_id]
-                # else:
-                #     print('shape load', self.load_dataset(path_unique).shape)
-                #     data_collective = np.vstack([data_collective, self.load_dataset(path_unique)[local_id]])
-                    
-            # X = np.array(data_collective)
             X = data_collective
-            print('X shape', X.shape, X[0].shape)
-            # X = X.reshape(X.shape[0]*X.shape[1], X.shape[2], X.shape[3], X.shape[4])
-            Y = self.flattened_labels[idx_global_start:idx_global_end]
-            return X, Y 
+            Y = labels_collective
+            
+            # if self._partitioning_strategy == 0:
+            #     Y = self.flattened_labels[idx_global_start:idx_global_end]
+            # elif self._partitioning_strategy == 1:
+            #     Y = self.flattened_labels[selected_elem_indices]
+            num_classes = np.unique(self.flattened_labels).shape[0]
+            print('X shape', X.shape, 'Y shape', Y.shape, 'num_classes', num_classes)
+            return X, Y, num_classes
     
     def load_dataset(self, h5_path):
         """
@@ -155,7 +174,7 @@ class DataIO(object):
                 print('Obtaining the shape of dataset %s' % dset_path_full)
                 shape = self.h5f[dset_path_full].shape
                 labels_m, labels_s, labels_t = self.get_labels(dset_name, cpos)
-                print(labels_t)
+                # print(labels_t)
                 # labels = self.h5f[label_dset_path_full][()]
                 # print(labels)
                 if t_lim is not None:
@@ -163,7 +182,7 @@ class DataIO(object):
                     flags = np.logical_and(labels_t>=t_low, labels_t<=t_high)
                     labels_t_ = (labels_t[flags] / 5).astype(np.int)
                     labels_t_ = labels_t_ - np.min(labels_t_)
-                    print('dset_loc', dset_loc)
+                    # print('dset_loc', dset_loc)
                     labels_cpos = np.ones(labels_t_.shape, dtype=np.int) * cpos
                     dset_loc = np.append(dset_loc, [dset_path_full]*np.sum(flags))  # repeat the h5 path n times
                     local_index = np.append(local_index, np.arange(0, shape[0], dtype=np.int)[flags])
@@ -184,7 +203,7 @@ class DataIO(object):
                     
                 print(label_flattened)
         
-        le = sklearn.preprocessing.LabelEncoder()
+        le = LabelEncoder()
         encoded_labels = le.fit_transform(label_flattened)
         if hvd_rank is not None:
             if hvd_rank == 0:
