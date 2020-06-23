@@ -16,6 +16,7 @@ from efficientnet.tfkeras import center_crop_and_resize, preprocess_input
 import numpy as np
 import pandas as pd
 from data_io_new import DataIO
+from models import *
 from callbacks import DataReshuffleCallback
 from sklearn.model_selection import train_test_split
 import os
@@ -56,6 +57,7 @@ class DeepGalaxyTraining(object):
         self._gpu_memory_allow_growth = False
         self._gpu_memory_fraction = None  # a number greater than 1 means that unified memory will be used; set to None for automatic handling
         self._multi_gpu_model = None
+        self.debug_mode = False 
         self._n_gpus = 1
         self._data_fn = None
         self._dset_name_pattern = None 
@@ -107,6 +109,16 @@ class DeepGalaxyTraining(object):
                 self.callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
                 self.callbacks.append(hvd.callbacks.MetricAverageCallback())
                 self.callbacks.append(DataReshuffleCallback(self))
+                if self.debug_mode is True:
+                    if hvd.rank() == 0:
+                        if not os.path.isdir('logs'):
+                            os.mkdir('logs')
+                        if not os.path.isdir('checkpoints'):
+                            os.mkdir('checkpoints')
+                        self.callbacks.append(tf.keras.callbacks.TensorBoard(log_dir='logs', histogram_freq=0, write_graph=True, write_images=False,
+                                                                            update_freq='epoch', profile_batch=2, embeddings_freq=0, embeddings_metadata=None))
+                        self.callbacks.append(tf.keras.callbacks.ModelCheckpoint('checkpoints/weights.{epoch:02d}-{val_loss:.2f}.hdf5', save_weights_only=True))
+
 
                 # Configure GPUs (if any)
                 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -127,6 +139,15 @@ class DeepGalaxyTraining(object):
                 self.logger.info('Parallel training disabled.')
                 self.logger.info('Batch_size = %d' % (self.batch_size))
         else:
+            self.callbacks.append(DataReshuffleCallback(self))
+            if self.debug_mode is True:
+                if not os.path.isdir('logs'):
+                    os.mkdir('logs')
+                if not os.path.isdir('checkpoints'):
+                    os.mkdir('checkpoints')
+                self.callbacks.append(tf.keras.callbacks.TensorBoard(log_dir='logs', histogram_freq=0, write_graph=True, write_images=False,
+                                                                    update_freq='epoch', profile_batch=2, embeddings_freq=0, embeddings_metadata=None))
+                self.callbacks.append(tf.keras.callbacks.ModelCheckpoint('checkpoints/weights.{epoch:02d}-{val_loss:.2f}.hdf5', save_weights_only=True))
             # Create logger
             self.logger = logging.getLogger('DeepGalaxyTrain')
             self.logger.setLevel(self.log_level)
@@ -178,41 +199,9 @@ class DeepGalaxyTraining(object):
                 self.logger.debug('Number of classes: %d' % self.num_classes)
 
     def load_model(self):
-        # if not os.path.isfile('efn_b4.h5'):
-        #     base_model = efn.EfficientNetB4(weights=None, include_top=True, input_shape=(self.input_shape[0], self.input_shape[1], 3), classes=self.num_classes)
-        #     base_model.save('efn_b4.h5')
-        # else:
-        #     base_model = tf.keras.models.load_model('efn_b4.h5', compile=False)
 
-        if 'EfficientNet' in self.base_model_name:
-            base_model = getattr(efn, self.base_model_name)(weights=None, include_top=True, input_shape=(self.input_shape[0], self.input_shape[1], 3), classes=self.num_classes)
-        else:
-            base_model = getattr(tf.keras.applications, self.base_model_name)(weights=None, include_top=True, input_shape=(self.input_shape[0], self.input_shape[1], 3), classes=self.num_classes)
-            # mod = __import__('efn.%s' % self.base_model_name)
-        print(base_model.summary())
-        if self.noise_stddev == 0:
-            # x = base_model.output
-            # x = tf.keras.layers.GlobalAveragePooling2D()(x)
-            # x = tf.keras.layers.Dropout(0.3)(x)
-            # predictions = tf.keras.layers.Dense(self.num_classes, activation='softmax')(x)
-            # model = tf.keras.models.Model(inputs = base_model.input, outputs = predictions)
-            # model = tf.keras.models.Model(inputs = base_model.input, outputs = base_model.outputs)
-            model = tf.keras.models.Sequential()
-            # model.add(tf.keras.layers.Lambda(lambda x: tf.repeat(x, 3, axis=-1), input_shape=self.input_shape))  # commented out since tf.repeat does not exist before 1.15
-            model.add(tf.keras.layers.Lambda(lambda x: tf.keras.backend.repeat_elements(x, 3, axis=-1), input_shape=self.input_shape))
-            model.add(base_model)
-            # model.add(tf.keras.layers.GlobalAveragePooling2D())
-            # model.add(tf.keras.layers.Dropout(0.3))
-            # model.add(tf.keras.layers.Dense(self.num_classes, activation='softmax'))
-        else:
-            model = tf.keras.models.Sequential()
-            # model.add(tf.keras.layers.Lambda(lambda x: tf.repeat(x, 3, axis=-1), input_shape=self.input_shape))  # commented out since tf.repeat does not exist before 1.15
-            model.add(tf.keras.layers.Lambda(lambda x: tf.keras.backend.repeat_elements(x, 3, axis=-1), input_shape=self.input_shape))
-            model.add(tf.keras.layers.GaussianNoise(self.noise_stddev, input_shape=self.input_shape))
-            model.add(base_model)
-            # model.add(tf.keras.layers.GlobalAveragePooling2D(name="gap"))
-            # model.add(tf.keras.layers.Dropout(0.3))
-            # model.add(tf.keras.layers.Dense(self.num_classes, activation="softmax", name="fc_out"))
+        # model = simple_keras_application(self.base_model_name, input_shape=self.input_shape, classes=self.num_classes)
+        model = simple_keras_application_with_imagenet_weight(self.base_model_name, input_shape=self.input_shape, classes=self.num_classes)
 
         if self.distributed_training is True:
             # opt = K.optimizers.SGD(0.001 * hvd.size())

@@ -25,9 +25,10 @@ if __name__ == "__main__":
     parser.add_argument("--multi-gpu", type=bool, nargs='?', const=True, default=False, help="Use Keras multi_gpu API (depreciated)")
     parser.add_argument('--distributed', dest='distributed', action='store_true', default=True, help='Turn on Horovod distributed training')
     parser.add_argument('--allow-growth', dest='allow_growth', action='store_true', default=True, help='Allow GPU memory to grow dypnamically according to the size of the model.')
+    parser.add_argument('--debug', dest='debug_mode', action='store_true', default=False, help='Enable debug model (invokes TensorBoard callback, generates TF timeline, etc.)')
     parser.add_argument('--gpu-mem-frac', dest='gpu_mem_frac', type=float, default=None, help='Fraction of GPU memory to allocate per process. If None, this is handled automaticaly. If a number > 1 is given, unified memory is used.')
     parser.add_argument('--no-distributed', dest='distributed', action='store_false', help='Turn off Horovid distributed training')
-    parser.add_argument('--noise', dest='noise_stddev', type=float, default=0.2, help='The stddev of the Gaussian noise for mitigatyying overfitting')
+    parser.add_argument('--noise', dest='noise_stddev', type=float, default=0.08, help='The stddev of the Gaussian noise for mitigatyying overfitting')
     parser.add_argument('--num-camera', dest='num_cam', type=int, default=14, help='Number of camera positions (for data augmentation). Choose an integer between 1 and 14')
     args = parser.parse_args()
 
@@ -41,6 +42,7 @@ if __name__ == "__main__":
     dgtrain.batch_size = args.batch_size
     dgtrain.learning_rate = args.lr
     dgtrain.epochs = args.epochs
+    dgtrain.debug_mode = args.debug_mode
     dgtrain.data_loading_mode = args.data_loading_mode
     dgtrain._gpu_memory_allow_growth = args.allow_growth
     if args.gpu_mem_frac is None:

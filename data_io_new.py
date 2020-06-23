@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd 
 import h5py
 import re
+import os 
 from sklearn.preprocessing import LabelEncoder
 
 
@@ -11,7 +12,7 @@ class DataIO(object):
         self.dset_loc = None  # h5 path of the dataset (for partial loading)
         self.local_index = None  # index of an element within a h5 dataset
         self.flattened_labels = None 
-        self._partitioning_strategy = 1 # 0: linear; 1: random sampling 
+        self._partitioning_strategy = 0 # 0: linear; 1: random sampling 
 
     def load_all(self, h5fn, dset_name_pattern, camera_pos='*', t_lim=None):
         """
@@ -206,10 +207,11 @@ class DataIO(object):
         le = LabelEncoder()
         encoded_labels = le.fit_transform(label_flattened)
         if hvd_rank is not None:
-            if hvd_rank == 0:
+            if hvd_rank == 0 and not os.path.isfile('label_encoder_classes.npy'):
                 np.save('label_encoder_classes.npy', le.classes_)
         else:
-            np.save('label_encoder_classes.npy', le.classes_)
+            if not os.path.isfile('label_encoder_classes.npy'):
+                np.save('label_encoder_classes.npy', le.classes_)
         return dset_loc, local_index.astype(np.int), encoded_labels
         # return dset_loc, local_index.astype(np.int), label_flattened
         
