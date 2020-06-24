@@ -12,7 +12,7 @@ class DataIO(object):
         self.dset_loc = None  # h5 path of the dataset (for partial loading)
         self.local_index = None  # index of an element within a h5 dataset
         self.flattened_labels = None 
-        self._partitioning_strategy = 0 # 0: linear; 1: random sampling 
+        self._partitioning_strategy = 0 # -1: load the full dataset on each node; 0: linear; 1: random sampling 
 
     def load_all(self, h5fn, dset_name_pattern, camera_pos='*', t_lim=None):
         """
@@ -81,7 +81,15 @@ class DataIO(object):
             n_images_per_proc = int(len(self.dset_loc) / hvd_size)
             print('hvd_size = %d, n_images_per_proc = %d, total_images = %d' % (hvd_size, n_images_per_proc, len(self.dset_loc)))
             
-            if self._partitioning_strategy == 0:
+            if self._partitioning_strategy == -1:
+                # every node load the full dataset regardless of how many workers
+                idx_global_start = 0
+                idx_global_end = self.dset_loc.shape[0]
+                print('Rank %d gets %d images, from #%d to #%d' % (hvd_rank, n_images_per_proc, idx_global_start, idx_global_end))
+                selected_elems = self.dset_loc[idx_global_start:idx_global_end]
+                selected_elems_idx_local = self.local_index[idx_global_start:idx_global_end]
+                selected_elem_labels = self.flattened_labels[idx_global_start:idx_global_end]
+            elif self._partitioning_strategy == 0:
                 # linear partitioning
                 idx_global_start = n_images_per_proc * hvd_rank
                 idx_global_end = n_images_per_proc * hvd_rank + n_images_per_proc
@@ -104,10 +112,8 @@ class DataIO(object):
             for path_unique, group_data in df.groupby('path'):
                 local_id = group_data['local_index'].to_numpy()
                 local_labels = group_data['labels'].to_numpy()
-                print(local_id, local_labels)
                 print('[Rank = %d, N_p = %d] Sampling %d elements from dataset: %s' % (hvd_rank, hvd_size, local_id.shape[0], path_unique))
                 if data_collective is None:
-                    print('id_local', local_id)
                     data_collective = self.load_dataset(path_unique)[local_id]
                     labels_collective = local_labels
                 else:
@@ -201,8 +207,6 @@ class DataIO(object):
                     # label_flattened = np.append(label_flattened, labels_cpos)
                 for tt in range(labels_t_.shape[0]):
                     label_flattened = np.append(label_flattened, '%d_%d' % (labels_t_[tt], labels_cpos[tt]))
-                    
-                print(label_flattened)
         
         le = LabelEncoder()
         encoded_labels = le.fit_transform(label_flattened)

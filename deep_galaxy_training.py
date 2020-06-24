@@ -82,8 +82,20 @@ class DeepGalaxyTraining(object):
         return flops.total_float_ops  # Prints the "flops" of the model.
 
     def initialize(self):
+        # set TF image format
         tf.keras.backend.set_image_data_format('channels_last')
-
+        
+        # set data pipeline loading/partitioning strategy
+        if self.data_loading_mode < 1:
+            # -1: load full dataset on node; 0: load partial dataset, but don't shuffle
+            self.data_io._partitioning_strategy = self.data_loading_mode 
+        else:
+            # When `data_loading_mode` > 0, a node loads a partial dataset randomly sampled from the 
+            #       full dataset, and it will do the loading per `data_load_model` epochs. In this case,
+            #       the `_partitioning_strategy` of `data_io` is set to 1 to ensure random sampling.
+            self.data_io._partitioning_strategy = 1
+        
+        # set up distributed training facility 
         if self.distributed_training is True:
             try:
                 import horovod.tensorflow.keras as hvd
