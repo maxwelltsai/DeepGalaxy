@@ -100,19 +100,19 @@ class DeepGalaxyTraining(object):
                 if hvd.rank() == 0:
                     self.logger.info('hvd_rank = %d, hvd_local_rank = %d' % (hvd.rank(), hvd.local_rank()))
 
-                # Bind a CUDA device to one MPI process (has no effect if GPUs are not used)
-                os.environ["CUDA_VISIBLE_DEVICES"] = str(hvd.local_rank())
-
                 # Add callbacks
                 self.callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
                 self.callbacks.append(hvd.callbacks.MetricAverageCallback())
                 self.callbacks.append(DataReshuffleCallback(self))
 
                 # Configure GPUs (if any)
-                gpu = tf.config.experimental.list_physical_devices('GPU')[hvd.local_rank()]
-                tf.config.experimental.set_memory_growth(gpu, self._gpu_memory_allow_growth)
-                tf.config.experimental.set_visible_devices(gpu, 'GPU')
- 
+                gpus = tf.config.experimental.list_physical_devices('GPU')
+
+                if hvd.local_rank() < len(gpus):
+                    gpu = gpus[hvd.local_rank()]
+                
+                    tf.config.experimental.set_memory_growth(gpu, self._gpu_memory_allow_growth)
+                    tf.config.experimental.set_visible_devices(gpu, 'GPU')
                 if self._gpu_memory_fraction is not None:
                     config = tf.compat.v1.ConfigProto()
                     config.gpu_options.per_process_gpu_memory_fraction = self._gpu_memory_fraction
