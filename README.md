@@ -6,7 +6,7 @@ In this project, a deep convolutional neural network (CNN) is trained with visua
 
 The simulations are carried out using [`Bonsai`](https://github.com/treecode/Bonsai) (Bédorf et al., 2012, 2019), a GPU-accelerated Barnes-Hut tree code. 
 
-The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan & Le, 2019)](https://arxiv.org/abs/1905.11946) and [ResNet (He et al. 2019)](https://arxiv.org/abs/1512.03385). The `EfficientNet` implementation is based on [this repository](https://github.com/qubvel/efficientnet). The implementations of other CNNs (including `ResNet50`) are based on the `tf.keras.applications` module. A full list of supported CNNs can be found at https://www.tensorflow.org/api_docs/python/tf/keras/applications.
+The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan & Le, 2019)](https://arxiv.org/abs/1905.11946) and [ResNet (He et al. 2019)](https://arxiv.org/abs/1512.03385). The `EfficientNet` implementation is based on [this repository](https://github.com/qubvel/efficientnet). The implementations of other CNNs (including `ResNet50`) are based on the `tf.keras.applications` module. A full list of supported CNNs can be found at [keras applications](https://www.tensorflow.org/api_docs/python/tf/keras/applications).
 
 
 
@@ -20,7 +20,13 @@ The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan
 - Horovod (optional; 0.19 or above)
 - MPI (OpenMPI/MPICH, required when Horovod is installed)
 
-It is recommended to install these packages in a Python virtual environment.
+
+Use the package manager conda to install dependencies.
+
+```
+conda install -r requirements.txt -n tf2gpu
+conda activate tf2gpu
+```
 
 ## Training data
 We simulated galaxy mergers of different mass ratios and size ratios (1:1, 1:2, 1:3, 2:3). The snapshots of the simulations are visualized once every 5 Myr (million years) using cameras from 14 different positions, and therefore generating 14 2D images. Each simulation should complete within a timescale of about 700 Myr. These images are stored in a compressed HDF5 dataset. The available image resolution are (256, 256), (512, 512), (1024, 1024), and (2048, 2048) pixels. The dataset is balanced.
