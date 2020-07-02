@@ -26,9 +26,9 @@ It is recommended to install these packages in a Python virtual environment.
 We simulated galaxy mergers of different mass ratios and size ratios (1:1, 1:2, 1:3, 2:3). The snapshots of the simulations are visualized once every 5 Myr (million years) using cameras from 14 different positions, and therefore generating 14 2D images. Each simulation should complete within a timescale of about 700 Myr. These images are stored in a compressed HDF5 dataset. The available image resolution are (256, 256), (512, 512), (1024, 1024), and (2048, 2048) pixels. The dataset is balanced.
 
 Download links for datasets of different resolutions:
-- (512, 512) pixels: https://surfdrive.surf.nl/files/index.php/s/Mzm28FQ1udG3FG7 (2GB)
-- (1024, 1024) pixels: https://surfdrive.surf.nl/files/index.php/s/ocfQlbdSbQ1n68q (6.1GB)
-- (2048, 2048) pixels: https://surfdrive.surf.nl/files/index.php/s/AbssrxetCnsi357 (14GB)
+- (512, 512) pixels: https://edu.nl/r3wh3 (2GB)
+- (1024, 1024) pixels: https://edu.nl/gcy96 (6.1GB)
+- (2048, 2048) pixels: https://edu.nl/bruf6 (14GB)
 
 ## Training
 
