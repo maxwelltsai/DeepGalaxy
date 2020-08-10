@@ -252,28 +252,21 @@ class DeepGalaxyTraining(object):
     def fit(self):
         if self.distributed_training is True:
             try:
-                # print('len(train_iter)', len(train_iter))
-                # if hvd.rank() == 0:
-                    # self.f_usage.write('len(train_iter) = %d, x_train.shape=%s\n' % (len(train_iter), x_train.shape))
                 self._t_start = datetime.now()
-                self.model.fit(self.x_train, self.y_train, batch_size=self.batch_size,
-                               epochs=self.epochs,
-                               callbacks=self.callbacks,
-                               verbose=1 if hvd.rank()==0 else 0,
-                               validation_data=(self.x_test, self.y_test))
+                if self.data_load_model == -1: 
+                    # all data are loaded on each single node. Need to use global batch size here
+                    self.model.fit(self.x_train, self.y_train, batch_size=self.batch_size*hvd.size(),
+                                epochs=self.epochs,
+                                callbacks=self.callbacks,
+                                verbose=1 if hvd.rank()==0 else 0,
+                                validation_data=(self.x_test, self.y_test))
+                else:
+                    self.model.fit(self.x_train, self.y_train, batch_size=self.batch_size,
+                                epochs=self.epochs,
+                                callbacks=self.callbacks,
+                                verbose=1 if hvd.rank()==0 else 0,
+                                validation_data=(self.x_test, self.y_test))
                 self._t_end = datetime.now()
-                # train_gen = ImageDataGenerator()
-                # train_iter = train_gen.flow(self.x_train, self.y_train, batch_size=self.batch_size)
-                # test_gen = ImageDataGenerator()
-                # test_iter = test_gen.flow(self.x_test, self.y_test, batch_size=self.batch_size)
-                # self.model.fit_generator(train_iter,
-                #     # batch_size=batch_size,
-                #     steps_per_epoch=len(train_iter) // hvd.size(),
-                #     epochs=self.epochs,
-                #     callbacks=self.callbacks,
-                #     verbose=1 if hvd.rank() == 0 else 0,
-                #     validation_data=test_gen.flow(self.x_test, self.y_test, self.batch_size),
-                #     validation_steps=len(test_iter) // hvd.size())
 
             except KeyboardInterrupt:
                 print('Terminating due to Ctrl+C...')
