@@ -30,9 +30,11 @@ import logging
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
 try:
-    import horovod.keras as hvd
+    import horovod.tensorflow.keras as hvd
 except ImportError as ie:
-    pass
+    print("Horovod not installed. If you want to run on single node/GPU, please run `python dg_train.py` instead of `mpirun -n 2 python dg_train.py`")
+    import sys
+    sys.exit(0)
 
 tf.compat.v1.disable_eager_execution()
 
@@ -50,18 +52,18 @@ class DeepGalaxyTraining(object):
         self.batch_size = 4
         self.noise_stddev = 0.3
         self.learning_rate = 1.0  # depends on the optimizer
-        self.data_loading_mode = 0 
+        self.data_loading_mode = 0
         self.base_model_name = 'EfficientNetB4'
         self.distributed_training = False
         self.multi_gpu_training = False
         self._gpu_memory_allow_growth = False
         self._gpu_memory_fraction = None  # a number greater than 1 means that unified memory will be used; set to None for automatic handling
         self._multi_gpu_model = None
-        self.debug_mode = False 
+        self.debug_mode = False
         self._n_gpus = 1
         self._data_fn = None
-        self._dset_name_pattern = None 
-        self._camera_pos = None 
+        self._dset_name_pattern = None
+        self._camera_pos = None
         self.callbacks = []
         self.logger = None
         self.log_level = logging.DEBUG
@@ -84,18 +86,18 @@ class DeepGalaxyTraining(object):
     def initialize(self):
         # set TF image format
         tf.keras.backend.set_image_data_format('channels_last')
-        
+
         # set data pipeline loading/partitioning strategy
         if self.data_loading_mode < 1:
             # -1: load full dataset on node; 0: load partial dataset, but don't shuffle
-            self.data_io._partitioning_strategy = self.data_loading_mode 
+            self.data_io._partitioning_strategy = self.data_loading_mode
         else:
-            # When `data_loading_mode` > 0, a node loads a partial dataset randomly sampled from the 
+            # When `data_loading_mode` > 0, a node loads a partial dataset randomly sampled from the
             #       full dataset, and it will do the loading per `data_load_model` epochs. In this case,
             #       the `_partitioning_strategy` of `data_io` is set to 1 to ensure random sampling.
             self.data_io._partitioning_strategy = 1
-        
-        # set up distributed training facility 
+
+        # set up distributed training facility
         if self.distributed_training is True:
             try:
                 import horovod.tensorflow.keras as hvd
@@ -134,14 +136,14 @@ class DeepGalaxyTraining(object):
 
                 if hvd.local_rank() < len(gpus):
                     gpu = gpus[hvd.local_rank()]
-                
+
                     tf.config.experimental.set_memory_growth(gpu, self._gpu_memory_allow_growth)
                     tf.config.experimental.set_visible_devices(gpu, 'GPU')
                 if self._gpu_memory_fraction is not None:
                     config = tf.compat.v1.ConfigProto()
                     config.gpu_options.per_process_gpu_memory_fraction = self._gpu_memory_fraction
                     session = tf.compat.v1.InteractiveSession(config=config)
-                    
+
             except ImportError as identifier:
                 print('Error importing horovod. Disabling distributed training.')
                 self.distributed_training = False
@@ -179,7 +181,7 @@ class DeepGalaxyTraining(object):
             camera_pos = self._camera_pos
         else:
             raise ValueError('The data_fn, dset_name_pattern, camera_pos arguments should be specified.')
-            
+
         if not self.distributed_training:
             self.logger.info('Loading the full dataset since distributed training is disabled ...')
             X, Y, self.num_classes = self.data_io.load_all(data_fn, dset_name_pattern=dset_name_pattern, camera_pos=camera_pos)
@@ -253,7 +255,7 @@ class DeepGalaxyTraining(object):
         if self.distributed_training is True:
             try:
                 self._t_start = datetime.now()
-                if self.data_load_model == -1: 
+                if self.data_load_model == -1:
                     # all data are loaded on each single node. Need to use global batch size here
                     self.model.fit(self.x_train, self.y_train, batch_size=self.batch_size*hvd.size(),
                                 epochs=self.epochs,
