@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 from data_io_new import DataIO
 from models import *
-from callbacks import DataReshuffleCallback
+from callbacks import DataReshuffleCallback, TimingCallback
 from sklearn.model_selection import train_test_split
 import os
 from datetime import datetime
@@ -29,12 +29,14 @@ import argparse
 import logging
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
+HVD_INSTALLED = False
+
 try:
     import horovod.tensorflow.keras as hvd
-except ImportError as ie:
-    print("Horovod not installed. If you want to run on single node/GPU, please run `python dg_train.py` instead of `mpirun -n 2 python dg_train.py`")
-    import sys
-    sys.exit(0)
+    HVD_INSTALLED = True
+except ImportError as error:
+    print("Cannot find horovod. Please run with Python dg_train.py instead of mpirun -np 2 python dg_train.py, otherwise it may cause a CUDA_OUT_OF_MEMORY_ERROR. Distributed training disabled.")
+
 
 tf.compat.v1.disable_eager_execution()
 
@@ -70,6 +72,7 @@ class DeepGalaxyTraining(object):
         self.input_shape = (512, 512, 3)  # (256, 256, 3)
         self._t_start = 0
         self._t_end = 0
+        self.weights_init = None 
 
     def get_flops(self, model):
         # run_meta = tf.RunMetadata()  # commented out since it doesn't work in TF2
@@ -93,14 +96,13 @@ class DeepGalaxyTraining(object):
             self.data_io._partitioning_strategy = self.data_loading_mode
         else:
             # When `data_loading_mode` > 0, a node loads a partial dataset randomly sampled from the
-            #       full dataset, and it will do the loading per `data_load_model` epochs. In this case,
+            #       full dataset, and it will do the loading per `data_loading_mode` epochs. In this case,
             #       the `_partitioning_strategy` of `data_io` is set to 1 to ensure random sampling.
             self.data_io._partitioning_strategy = 1
 
         # set up distributed training facility
         if self.distributed_training is True:
-            try:
-                import horovod.tensorflow.keras as hvd
+            if HVD_INSTALLED:
                 # initialize horovod
                 hvd.init()
                 if hvd.rank() == 0:
@@ -118,8 +120,10 @@ class DeepGalaxyTraining(object):
 
                 # Add callbacks
                 self.callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
-                self.callbacks.append(hvd.callbacks.MetricAverageCallback())
+                # self.callbacks.append(hvd.BroadcastGlobalVariablesHook(0))
+                self.callbacks.append(hvd.callbacks.MetricAverageCallback()) # caused warning with TF 2.3
                 self.callbacks.append(DataReshuffleCallback(self))
+                self.callbacks.append(TimingCallback(hvd.rank()))
                 if self.debug_mode is True:
                     if hvd.rank() == 0:
                         if not os.path.isdir('logs'):
@@ -144,8 +148,7 @@ class DeepGalaxyTraining(object):
                     config.gpu_options.per_process_gpu_memory_fraction = self._gpu_memory_fraction
                     session = tf.compat.v1.InteractiveSession(config=config)
 
-            except ImportError as identifier:
-                print('Error importing horovod. Disabling distributed training.')
+            else:
                 self.distributed_training = False
                 self.logger = logging.getLogger('DeepGalaxyTrain')
                 self.logger.setLevel(self.log_level)
@@ -214,8 +217,10 @@ class DeepGalaxyTraining(object):
 
     def load_model(self):
 
-        # model = simple_keras_application(self.base_model_name, input_shape=self.input_shape, classes=self.num_classes)
-        model = simple_keras_application_with_imagenet_weight(self.base_model_name, input_shape=self.input_shape, classes=self.num_classes)
+        if self.weights_init is None:
+            model = simple_keras_application(self.base_model_name, input_shape=self.input_shape, classes=self.num_classes, noise_stddev=self.noise_stddev)
+        elif self.weights_init == 'imagenet':
+            model = simple_keras_application_with_imagenet_weights(self.base_model_name, input_shape=self.input_shape, classes=self.num_classes, noise_stddev=self.noise_stddev)
 
         if self.distributed_training is True:
             # opt = K.optimizers.SGD(0.001 * hvd.size())
@@ -255,7 +260,7 @@ class DeepGalaxyTraining(object):
         if self.distributed_training is True:
             try:
                 self._t_start = datetime.now()
-                if self.data_load_model == -1:
+                if self.data_loading_mode == -1:
                     # all data are loaded on each single node. Need to use global batch size here
                     self.model.fit(self.x_train, self.y_train, batch_size=self.batch_size*hvd.size(),
                                 epochs=self.epochs,
@@ -305,17 +310,17 @@ class DeepGalaxyTraining(object):
                 self._t_end = datetime.now()
                 print('Elapsed time:', self._t_end - self._t_start)
                 print('Saving model...')
-        print(self.get_flops(self.model))
+        # print(self.get_flops(self.model))
 
     def save_model(self):
         if self.distributed_training is True:
             if hvd.rank() == 0:
-                if self.noise_stddev > 0 is True:
+                if self.noise_stddev > 0:
                     self.model.save('model_%d_%s_noise_np_%d.h5' % (self.input_shape[0], self.base_model_name, hvd.size()))
                 else:
                     self.model.save('model_%d_%s_np_%d.h5' % (self.input_shape[0], self.base_model_name, hvd.size()))
         else:
-            if self.noise_stddev > 0 is True:
+            if self.noise_stddev > 0:
                 self.model.save('model_%d_%s_noise.h5' % (self.input_shape[0], self.base_model_name))
             else:
                 self.model.save('model_%d_%s.h5' % (self.input_shape[0], self.base_model_name))

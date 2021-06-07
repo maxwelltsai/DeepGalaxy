@@ -30,6 +30,7 @@ if __name__ == "__main__":
     parser.add_argument('--no-distributed', dest='distributed', action='store_false', help='Turn off Horovid distributed training')
     parser.add_argument('--noise', dest='noise_stddev', type=float, default=0.08, help='The stddev of the Gaussian noise for mitigatyying overfitting')
     parser.add_argument('--num-camera', dest='num_cam', type=int, default=14, help='Number of camera positions (for data augmentation). Choose an integer between 1 and 14')
+    parser.add_argument('--weights', dest='weights', type=str, default=None, help='Weights for initialization. Could be imagenet or None.')
     args = parser.parse_args()
 
     print(args)
@@ -45,13 +46,13 @@ if __name__ == "__main__":
     dgtrain.debug_mode = args.debug_mode
     dgtrain.data_loading_mode = args.data_loading_mode
     dgtrain._gpu_memory_allow_growth = args.allow_growth
+    dgtrain.weights_init = args.weights
     if args.gpu_mem_frac is None:
         dgtrain._gpu_memory_fraction = None
     else:
         dgtrain._gpu_memory_fraction = float(args.gpu_mem_frac)
     dgtrain.initialize()
     dgtrain.load_data(args.file_name, dset_name_pattern=args.datasets, camera_pos=range(0, args.num_cam))
-    # dgtrain.load_data(args.file_name, dset_name_pattern=args.datasets, camera_pos=[1,2,3])
     dgtrain.load_model()
     dgtrain.fit()
     dgtrain.save_model()
