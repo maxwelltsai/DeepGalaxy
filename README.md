@@ -11,22 +11,18 @@ The CNN is built with state-of-the-art architectures, such as [EfficientNet (Tan
 
 
 ## Prerequisites
-- Python 3 (tested on Python 3.6 and 3.7)
-- TensorFlow (1.14 or above, 2.1 or above)
-- Scikit-learn
-- Scikit-image
-- OpenCV-Python
-- h5py
+- Python 3 (tested on Python 3.8)
+- TensorFlow 2.x (tested on TensorFlow 2.3.1)
+- Scikit-learn (tested on 0.24.1)
+- Scikit-image (tested on 0.18.1)
+- OpenCV-Python (tested on 4.5.1.48)
+- h5py (tested on 2.10.0)
+- keras-applications (tested on 1.0.8)
 - Horovod (optional; 0.19 or above)
 - MPI (OpenMPI/MPICH, required when Horovod is installed)
 
+It is recommended to install the prerequisites within a virtual environment.
 
-Use the package manager conda to install dependencies.
-
-```
-conda install -r requirements.txt -n tf2gpu
-conda activate tf2gpu
-```
 
 ## Training data
 We simulated galaxy mergers of different mass ratios and size ratios (1:1, 1:2, 1:3, 2:3). The snapshots of the simulations are visualized once every 5 Myr (million years) using cameras from 14 different positions, and therefore generating 14 2D images. Each simulation should complete within a timescale of about 700 Myr. These images are stored in a compressed HDF5 dataset. The available image resolution are (256, 256), (512, 512), (1024, 1024), and (2048, 2048) pixels. The dataset is balanced.
@@ -70,6 +66,25 @@ where `-np 32` should be changed according to the actual number of MPI processes
 When high-resolution images are trained on a large DNN, the memory consumption of the DNN parameters and activation maps may (far) exceed the available GPU memory. In this case, it is still possible to map the host memory to the GPUs. This can be done by passing a value greater than 1 to the `--gpu-mem-frac` argument. For example, `--gpu-mem-frac 5` means that it allows CUDA to allocate 5 times the size of the GPU memory. So if the GPU memory is 32 GB, then the usable memory for the GPU in this case will be 160 GB.
 
 Please note that this option usually comes with performance penalty. Alternatively, running large models on CPUs may actually be faster in certain hardware configurations.
+
+## Use DeepGalaxy as a benchmark suite
+DeepGalaxy provides benchmark information (throughput) for the underlying hardware system. In the `train_log.txt` output file, the throughput of the code looks like this
+```
+[Performance] Epoch 0 takes 107.62 seconds. Throughput: 2.37 images/sec (per node), 9.48 images/sec (total)
+[Performance] Epoch 1 takes 17.07 seconds. Throughput: 14.94 images/sec (per node), 59.75 images/sec (total)
+[Performance] Epoch 2 takes 10.97 seconds. Throughput: 23.24 images/sec (per node), 92.94 images/sec (total)
+[Performance] Epoch 3 takes 11.01 seconds. Throughput: 23.16 images/sec (per node), 92.63 images/sec (total)
+[Performance] Epoch 4 takes 11.02 seconds. Throughput: 23.14 images/sec (per node), 92.56 images/sec (total)
+[Performance] Epoch 5 takes 10.82 seconds. Throughput: 23.57 images/sec (per node), 94.27 images/sec (total)
+[Performance] Epoch 6 takes 10.86 seconds. Throughput: 23.48 images/sec (per node), 93.92 images/sec (total)
+[Performance] Epoch 7 takes 10.95 seconds. Throughput: 23.29 images/sec (per node), 93.17 images/sec (total)
+[Performance] Epoch 8 takes 10.93 seconds. Throughput: 23.33 images/sec (per node), 93.32 images/sec (total)
+[Performance] Epoch 9 takes 11.01 seconds. Throughput: 23.17 images/sec (per node), 92.67 images/sec (total)
+```
+The above performance log gives insights into the throughput per node and the total throughput (if trained with multiple nodes/processors). Typically, the first 2-3 epochs have lower throughput due to the initialization effect. As such, the throughput should be read after the 3rd epoch when the throughput becomes stable. 
+
+By varying the number of workers (`-np` arguments, see above) and plot the corresponding total throughput as a function of `-np`, one can obtain a figure of scaling efficiency. Ideally, the total throughput scales linearly as a function of `-np`.  Practically, when `-np` is low, the scaling behavior is nearly linear, but the overhead picks up for large `-np` due to the communication costs in the `Allreduce` data parallel training. 
+
 
 ## Acknowledgement
 This project is supported by [PRACE](https://prace-ri.eu/), [SURF](https://www.surf.nl/en), [Intel PCC](https://software.intel.com/content/www/us/en/develop/topics/parallel-computing-centers.html), and [Leiden Observatory](https://www.universiteitleiden.nl/en/science/astronomy).
