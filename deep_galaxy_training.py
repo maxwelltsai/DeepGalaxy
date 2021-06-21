@@ -123,7 +123,7 @@ class DeepGalaxyTraining(object):
                 # self.callbacks.append(hvd.BroadcastGlobalVariablesHook(0))
                 self.callbacks.append(hvd.callbacks.MetricAverageCallback()) # caused warning with TF 2.3
                 self.callbacks.append(DataReshuffleCallback(self))
-                self.callbacks.append(TimingCallback(hvd.rank()))
+                self.callbacks.append(TimingCallback(rank=hvd.rank(), n_workers=hvd.size(), dg_inst=self))
                 if self.debug_mode is True:
                     if hvd.rank() == 0:
                         if not os.path.isdir('logs'):
@@ -157,6 +157,7 @@ class DeepGalaxyTraining(object):
                 self.logger.info('Batch_size = %d' % (self.batch_size))
         else:
             self.callbacks.append(DataReshuffleCallback(self))
+            self.callbacks.append(TimingCallback(rank=0, n_workers=1, dg_inst=self))
             if self.debug_mode is True:
                 if not os.path.isdir('logs'):
                     os.mkdir('logs')
