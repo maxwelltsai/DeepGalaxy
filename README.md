@@ -70,16 +70,16 @@ Please note that this option usually comes with performance penalty. Alternative
 ## Use DeepGalaxy as a benchmark suite
 DeepGalaxy provides benchmark information (throughput) for the underlying hardware system. In the `train_log.txt` output file, the throughput of the code looks like this
 ```
-[Performance] Epoch 0 takes 107.62 seconds. Throughput: 2.37 images/sec (per node), 9.48 images/sec (total)
-[Performance] Epoch 1 takes 17.07 seconds. Throughput: 14.94 images/sec (per node), 59.75 images/sec (total)
-[Performance] Epoch 2 takes 10.97 seconds. Throughput: 23.24 images/sec (per node), 92.94 images/sec (total)
-[Performance] Epoch 3 takes 11.01 seconds. Throughput: 23.16 images/sec (per node), 92.63 images/sec (total)
-[Performance] Epoch 4 takes 11.02 seconds. Throughput: 23.14 images/sec (per node), 92.56 images/sec (total)
-[Performance] Epoch 5 takes 10.82 seconds. Throughput: 23.57 images/sec (per node), 94.27 images/sec (total)
-[Performance] Epoch 6 takes 10.86 seconds. Throughput: 23.48 images/sec (per node), 93.92 images/sec (total)
-[Performance] Epoch 7 takes 10.95 seconds. Throughput: 23.29 images/sec (per node), 93.17 images/sec (total)
-[Performance] Epoch 8 takes 10.93 seconds. Throughput: 23.33 images/sec (per node), 93.32 images/sec (total)
-[Performance] Epoch 9 takes 11.01 seconds. Throughput: 23.17 images/sec (per node), 92.67 images/sec (total)
+[Performance] Epoch 0 takes 107.60 seconds. Throughput: 2.37 images/sec (per worker), 9.48 images/sec (total)
+[Performance] Epoch 1 takes 17.15 seconds. Throughput: 14.87 images/sec (per worker), 59.47 images/sec (total)
+[Performance] Epoch 2 takes 10.95 seconds. Throughput: 23.29 images/sec (per worker), 93.15 images/sec (total)
+[Performance] Epoch 3 takes 10.99 seconds. Throughput: 23.21 images/sec (per worker), 92.82 images/sec (total)
+[Performance] Epoch 4 takes 11.01 seconds. Throughput: 23.17 images/sec (per worker), 92.67 images/sec (total)
+[Performance] Epoch 5 takes 11.00 seconds. Throughput: 23.18 images/sec (per worker), 92.72 images/sec (total)
+[Performance] Epoch 6 takes 11.05 seconds. Throughput: 23.08 images/sec (per worker), 92.31 images/sec (total)
+[Performance] Epoch 7 takes 11.16 seconds. Throughput: 22.86 images/sec (per worker), 91.44 images/sec (total)
+[Performance] Epoch 8 takes 11.11 seconds. Throughput: 22.96 images/sec (per worker), 91.85 images/sec (total)
+[Performance] Epoch 9 takes 11.10 seconds. Throughput: 22.97 images/sec (per worker), 91.87 images/sec (total)
 ```
 The above performance log gives insights into the throughput per node and the total throughput (if trained with multiple nodes/processors). Typically, the first 2-3 epochs have lower throughput due to the initialization effect. As such, the throughput should be read after the 3rd epoch when the throughput becomes stable. 
 
@@ -90,4 +90,4 @@ By varying the number of workers (`-np` arguments, see above) and plot the corre
 This project is supported by [PRACE](https://prace-ri.eu/), [SURF](https://www.surf.nl/en), [Intel PCC](https://software.intel.com/content/www/us/en/develop/topics/parallel-computing-centers.html), and [Leiden Observatory](https://www.universiteitleiden.nl/en/science/astronomy).
 
 ## Contact
-Questions/comments please direct to Maxwell X. Cai: maxwell.cai _at_ surfsara.nl
+Questions/comments please direct to Maxwell X. Cai: maxwell.cai _at_ surf.nl

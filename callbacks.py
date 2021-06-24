@@ -31,7 +31,7 @@ class TimingCallback(tf.keras.callbacks.Callback):
         n_samples = self.dg_inst.y_train.shape[0]
 
         if self.rank == 0:
-            msg = '[Performance] Epoch %d takes %0.2f seconds. Throughput: %0.2f images/sec (per node), %0.2f images/sec (total)' % (epoch, dt, n_samples/dt, n_samples/dt*self.n_workers) 
+            msg = '[Performance] Epoch %d takes %0.2f seconds. Throughput: %0.2f images/sec (per worker), %0.2f images/sec (total)' % (epoch, dt, n_samples/dt, n_samples/dt*self.n_workers) 
             
             if self.logger is None:
                 print(msg)

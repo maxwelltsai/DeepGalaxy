@@ -10,9 +10,9 @@ Maxwell Cai (SURF), October 2019 - May 2020.
 
 
 import tensorflow as tf
-import efficientnet.tfkeras as efn
+# import efficientnet.tfkeras as efn
 from skimage.io import imread
-from efficientnet.tfkeras import center_crop_and_resize, preprocess_input
+# from efficientnet.tfkeras import center_crop_and_resize, preprocess_input
 import numpy as np
 import pandas as pd
 from data_io_new import DataIO
