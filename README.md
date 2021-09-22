@@ -45,6 +45,7 @@ The training can be done on a single node or multiple nodes. If you are running 
 - `--noise`: mitigating overfitting by imposing a random Gaussian noise. This argument specifies the standard derivation of the noise. 
 - `-m`: Reshuffle the training/testing dataset every `-m` epochs. This option is useful in distributed training, since a compute node will only load a fraction of the full dataset. If `-m` is set to -1, every node/worker will load the full dataset; If `-m` is set to 0, the training/testing data are splitted among nodes/workers and are loaded only once during the initialization phase of the code, and a compute node will never be able to see the data on other nodes. If `-m` is set to an integer larger than 0, the training/testing data are also splitted among nodes/workers, but the data loading pipeline will be triggered every `-m` epochs, allowing a node to access data that are previous on other nodes.
 - `--debug`: enables debug model when this flag is presented in the command line. This will cause the code to save model checkpoints per epoch and invoke TensorBoard callbacks.
+- `--weights`: initialization of the weights. Use `imagenet` to allow the network to be initialized with imagenet weights, or `None` to disable initialization. The default is None.
 
 ### Training on a single node.
 
