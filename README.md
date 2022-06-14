@@ -25,12 +25,12 @@ It is recommended to install the prerequisites within a virtual environment.
 
 
 ## Training data
-We simulated galaxy mergers of different mass ratios and size ratios (1:1, 1:2, 1:3, 2:3). The snapshots of the simulations are visualized once every 5 Myr (million years) using cameras from 14 different positions, and therefore generating 14 2D images. Each simulation should complete within a timescale of about 700 Myr. These images are stored in a compressed HDF5 dataset. The available image resolution are (256, 256), (512, 512), (1024, 1024), and (2048, 2048) pixels. The dataset is balanced.
+We simulated galaxy mergers of different mass ratios and size ratios (1:1, 1:2, 1:3, 2:3). The snapshots of the simulations are visualized once every 5 Myr (million years) using cameras from 14 different positions, and therefore generating 14 2D images. Each simulation should complete within a timescale of about 700 Myr. These images are stored in a compressed HDF5 dataset. The available image resolution are (256, 256), (512, 512), (1024, 1024), and (2048, 2048) pixels. The datasets are balanced.
 
 Download links for datasets of different resolutions:
-- (512, 512) pixels: https://edu.nl/guvv4 (2GB)
-- (1024, 1024) pixels: https://edu.nl/r6eh8 (6.1GB)
-- (2048, 2048) pixels: https://edu.nl/ppnam (14GB)
+- 512x512 pixels: https://edu.nl/guvv4 (2GB)
+- 1024x1024 pixels: https://edu.nl/r6eh8 (6.1GB)
+- 2048x2048 pixels: https://edu.nl/ppnam (14GB)
 
 ## Training
 
@@ -88,7 +88,7 @@ By varying the number of workers (`-np` arguments, see above) and plot the corre
 
 
 ## Acknowledgement
-This project is supported by [PRACE](https://prace-ri.eu/), [SURF](https://www.surf.nl/en), [Intel PCC](https://software.intel.com/content/www/us/en/develop/topics/parallel-computing-centers.html), and [Leiden Observatory](https://www.universiteitleiden.nl/en/science/astronomy).
+This project is supported by [Intel Corporation](https://www.intel.com), [PRACE](https://prace-ri.eu/), [SURF](https://www.surf.nl/en), and [Leiden Observatory](https://www.universiteitleiden.nl/en/science/astronomy).
 
 ## Contact
-Questions/comments please direct to Maxwell X. Cai: maxwell.cai _at_ surf.nl
+Questions/comments please direct to Maxwell X. Cai: maxwell.cai _at_ intel dot com
